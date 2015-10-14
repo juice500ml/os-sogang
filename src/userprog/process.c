@@ -215,6 +215,24 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  // 3.3.3 argument passing
+  int argc = 0;
+  char *argv[32] = {NULL,}; // 128 bytes on command-line arguments. 4 bytes per pointer.
+  char *tok;
+  char *fn_copy;
+  char *save_ptr;
+  
+  /* Make a copy of FILE_NAME for strtok_r(). */
+  fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+ 
+  /* Save every arguments in argv[], with last NULL. */
+  for(i=1, tok=argv[0]=strtok_r(fn_copy," ",&save_ptr); (tok=strtok_r(NULL," ",&save_ptr))!=NULL; ++i)
+    argv[i] = tok;
+  argv[i] = calloc(1,sizeof(char));
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
