@@ -340,6 +340,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
     // save ptr where argv is saved
     argv[i] = curr;
   }
+  // fn_copy not used afterwards
+  free(fn_copy);
   // word-align
   for(i=(4-align)%4; i; --i)
   {
