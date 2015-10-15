@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -54,6 +55,7 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -88,6 +90,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  // To watch for child process. To be changed after.
+  while(1);
   return -1;
 }
 
@@ -215,7 +219,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
-  // 3.3.3 argument passing
+  // 3.3.3 argument passing: Parsing argc and argv[]
   int argc = 0;
   char *argv[32] = {NULL,}; // 128 bytes on command-line arguments. 4 bytes per pointer.
   char *tok;
@@ -223,15 +227,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char *save_ptr;
   
   /* Make a copy of FILE_NAME for strtok_r(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  fn_copy = malloc (strlen(file_name)+1);
+  strlcpy (fn_copy, file_name, strlen(file_name)+1);
  
   /* Save every arguments in argv[], with last NULL. */
-  for(i=1, tok=argv[0]=strtok_r(fn_copy," ",&save_ptr); (tok=strtok_r(NULL," ",&save_ptr))!=NULL; ++i)
-    argv[i] = tok;
-  argv[i] = calloc(1,sizeof(char));
+  argv[0] = strtok_r(fn_copy," ",&save_ptr);
+  for(argc=1; (tok=strtok_r(NULL," ",&save_ptr))!=NULL; ++argc)
+  {
+    argv[argc] = tok;
+  }
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -240,7 +244,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (argv[0]);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -264,6 +268,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_ofset = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
     {
+      printf("%d!\n",i);
       struct Elf32_Phdr phdr;
 
       if (file_ofset < 0 || file_ofset > file_length (file))
@@ -322,7 +327,23 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
-
+/*
+  // 3.3.3 argument passing: Pushing argc and argv[] in stack
+  void* curr = *esp;
+  int align = 0;
+  for(i=argc; i; --i)
+  {
+    memcpy(curr, argv[i-1], strlen(argv[i-1])+1);
+    align += strlen(argv[i-1])+1;
+    align %= 4;
+    curr -= strlen(argv[i-1])+1;
+  }
+  for(i=(4-align)%4; i; --i)
+  {
+    memcpy(curr, "\0", 1);
+    --curr;
+  }
+*/  hex_dump(64,*esp,64,true);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -455,7 +476,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }
