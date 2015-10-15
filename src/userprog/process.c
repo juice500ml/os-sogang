@@ -91,7 +91,6 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   // To watch for child process. To be changed after.
-  printf("process_wait\n");
   while(1);
   return -1;
 }
@@ -331,20 +330,41 @@ load (const char *file_name, void (**eip) (void), void **esp)
   // 3.3.3 argument passing: Pushing argc and argv[] in stack
   void* curr = *esp;
   int align = 0;
-  for(i=argc; i; --i)
+  // each argv[]
+  for(i=argc-1; i>=0; --i)
   {
-    memcpy(curr, argv[i-1], strlen(argv[i-1])+1);
-    align += strlen(argv[i-1])+1;
+    align += strlen(argv[i])+1;
     align %= 4;
-    curr -= strlen(argv[i-1])+1;
-    printf("%d:%s\n",i,argv[i]);
+    curr -= strlen(argv[i])+1;
+    memcpy(curr, argv[i], strlen(argv[i])+1);
+    // save ptr where argv is saved
+    argv[i] = curr;
   }
+  // word-align
   for(i=(4-align)%4; i; --i)
   {
-    memcpy(curr, "\0", 1);
     --curr;
+    memcpy(curr, "\0", 1);
   }
-  hex_dump(64,*esp,64,true);
+  // argv[] ptr (starts from null)
+  for(i=argc; i>=0; --i)
+  {
+    curr -= sizeof(void*);
+    memcpy(curr, argv+i, sizeof(void*));
+  }
+  // argv ptr
+  argv[argc] = curr;
+  curr -= sizeof(void*);
+  memcpy(curr, argv+argc, sizeof(void*));
+  // argc
+  curr -= sizeof(int);
+  memcpy(curr, &argc, sizeof(int));
+  // return addr
+  curr -= sizeof(void*);
+  memset(curr, 0, sizeof(void*));
+  // esp init
+  *esp = curr;
+  
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
