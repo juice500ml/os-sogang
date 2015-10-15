@@ -91,6 +91,7 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   // To watch for child process. To be changed after.
+  printf("process_wait\n");
   while(1);
   return -1;
 }
@@ -268,7 +269,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   file_ofset = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
     {
-      printf("%d!\n",i);
       struct Elf32_Phdr phdr;
 
       if (file_ofset < 0 || file_ofset > file_length (file))
@@ -327,7 +327,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
-/*
+
   // 3.3.3 argument passing: Pushing argc and argv[] in stack
   void* curr = *esp;
   int align = 0;
@@ -337,13 +337,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
     align += strlen(argv[i-1])+1;
     align %= 4;
     curr -= strlen(argv[i-1])+1;
+    printf("%d:%s\n",i,argv[i]);
   }
   for(i=(4-align)%4; i; --i)
   {
     memcpy(curr, "\0", 1);
     --curr;
   }
-*/  hex_dump(64,*esp,64,true);
+  hex_dump(64,*esp,64,true);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -379,7 +380,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
   /* The segment must not be empty. */
   if (phdr->p_memsz == 0)
     return false;
-  
+
   /* The virtual memory region must both start and end within the
      user address space range. */
   if (!is_user_vaddr ((void *) phdr->p_vaddr))
@@ -399,6 +400,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
      assertions in memcpy(), etc. */
   if (phdr->p_vaddr < PGSIZE)
     return false;
+  // TODO: Dies here!
 
   /* It's okay. */
   return true;
@@ -476,7 +478,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
