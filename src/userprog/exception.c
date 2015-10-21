@@ -127,6 +127,10 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
+  // 3.1.5 accessing user memory: copy eax to eip and set -1
+  f->eip = (void*) f->eax;
+  f->eax = -1;
+
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
      data.  It is not necessarily the address of the instruction
