@@ -91,7 +91,8 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   // To watch for child process. To be changed after.
-  while(1);
+  int i=0,j=0;
+  for(i=0;i<200000000;++i) j += i;
   return -1;
 }
 
@@ -221,21 +222,21 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   // 3.3.3 argument passing: Parsing argc and argv[]
   int argc = 0;
-  char *argv[32] = {NULL,}; // 128 bytes on command-line arguments. 4 bytes per pointer.
+  char *argv[128] = {NULL,}; // 128 bytes on command-line arguments.
   char *tok;
   char *fn_copy;
   char *save_ptr;
-  
+
   /* Make a copy of FILE_NAME for strtok_r(). */
   fn_copy = malloc (strlen(file_name)+1);
   strlcpy (fn_copy, file_name, strlen(file_name)+1);
- 
+
   /* Save every arguments in argv[], with last NULL. */
   argv[0] = strtok_r(fn_copy," ",&save_ptr);
   for(argc=1; (tok=strtok_r(NULL," ",&save_ptr))!=NULL; ++argc)
-  {
-    argv[argc] = tok;
-  }
+    {
+      argv[argc] = tok;
+    }
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -332,28 +333,28 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int align = 0;
   // each argv[]
   for(i=argc-1; i>=0; --i)
-  {
-    align += strlen(argv[i])+1;
-    align %= 4;
-    curr -= strlen(argv[i])+1;
-    memcpy(curr, argv[i], strlen(argv[i])+1);
-    // save ptr where argv is saved
-    argv[i] = curr;
-  }
+    {
+      align += strlen(argv[i])+1;
+      align %= 4;
+      curr -= strlen(argv[i])+1;
+      memcpy(curr, argv[i], strlen(argv[i])+1);
+      // save ptr where argv is saved
+      argv[i] = curr;
+    }
   // fn_copy not used afterwards
   free(fn_copy);
   // word-align
   for(i=(4-align)%4; i; --i)
-  {
-    --curr;
-    memcpy(curr, "\0", 1);
-  }
+    {
+      --curr;
+      memcpy(curr, "\0", 1);
+    }
   // argv[] ptr (starts from null)
   for(i=argc; i>=0; --i)
-  {
-    curr -= sizeof(void*);
-    memcpy(curr, argv+i, sizeof(void*));
-  }
+    {
+      curr -= sizeof(void*);
+      memcpy(curr, argv+i, sizeof(void*));
+    }
   // argv ptr
   argv[argc] = curr;
   curr -= sizeof(void*);
@@ -366,13 +367,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
   memset(curr, 0, sizeof(void*));
   // esp init
   *esp = curr;
-  
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
- done:
+done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;

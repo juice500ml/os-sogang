@@ -17,11 +17,13 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  int syscall_number = *((int*)f->eip);
+  int syscall_number = *((int*)f->esp);
+  // unknown issue: bit shifted 16 bits. don't know why.
+  void *esp = f->esp + 16;
   switch(syscall_number)
   {
     case  0   : break;
-    case  1   : break;
+    case  1   : syscall_exit(*(int*)(esp+4)); break;
     case  2   : break;
     case  3   : break;
     case  4   : break;
@@ -29,12 +31,12 @@ syscall_handler (struct intr_frame *f)
     case  6   : break;
     case  7   : break;
     case  8   : break;
-    case  9   : break;
+    case  9   : f->eax = syscall_write(*(int*)(esp+4), *(const void**)(esp+8), *(unsigned*)(esp+12)); break;
     case  10  : break;
     case  11  : break;
     case  12  : break;
     case  20  : break;
-    case  21  : break;
+    case  21  : f->eax = *(int*)(esp+4) + *(int*)(esp+8) + *(int*)(esp+12) + *(int*)(esp+16); break;
     default   : syscall_exit(-1);
   }
 }
@@ -62,60 +64,30 @@ write_byte (uint8_t *udst, uint8_t byte)
 void
 syscall_exit (int status)
 {
-  struct list_elem *l = &(thread_current()->allelem);
-  
-  // find head of thread list
-  while(l->prev != NULL) l = list_prev(l);
-  // traverse through all thread
-  for(l=list_next(l); l->next != NULL; )
-  {
-    struct list_elem *next = l=list_next(l);
-    list_remove(l);
-    free(l);
-  }
-
+  int i;
+  char *name = thread_current()->name;
+  for(i=0;i<16;++i)
+    if(name[i]==' ') break;
+  name[i] = '\0';
+  printf("%s: exit(%d)\n", thread_current()->name, status);
   thread_exit();
   return;
 }
 
 pid_t
-syscall_exec (const char *cmdline)
+syscall_exec (const char *cmdline UNUSED)
 {
 
 }
 
 int
-syscall_wait (pid_t pid)
-{
-
-}
-
-bool
-syscall_create (const char *file, unsigned initial_size)
-{
-
-}
-
-bool
-syscall_remove (const char *file)
+syscall_wait (pid_t pid UNUSED)
 {
 
 }
 
 int
-syscall_open (const char *file)
-{
-
-}
-
-int
-syscall_filesize (int fd)
-{
-
-}
-
-int
-syscall_read (int fd, void *buf, unsigned size)
+syscall_read (int fd UNUSED, void *buf UNUSED, unsigned size UNUSED)
 {
 
 }
@@ -123,23 +95,12 @@ syscall_read (int fd, void *buf, unsigned size)
 int
 syscall_write (int fd, const void *buf, unsigned size)
 {
-
-}
-
-void
-syscall_seek (int fd, unsigned position)
-{
-
-}
-
-unsigned
-syscall_tell (int fd)
-{
-
-}
-
-void
-syscall_close (int fd)
-{
-
+  if(fd==1)
+    {
+      unsigned i;
+      for(i=0;i<size;++i)
+        if(!*((char*)(buf)+i)) break;
+      putbuf(buf, i);
+      return i;
+    }
 }
