@@ -19,6 +19,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
+  printf("HANDLER\n");
   int syscall_number = *((int*)f->esp);
   // unknown issue: bit shifted 16 bits. don't know why.
   void *esp = f->esp + 16;
@@ -128,6 +129,7 @@ syscall_write (int fd, const void *buf, unsigned size)
 int
 syscall_fibonacci (int n)
 {
+  printf("FIBO IN\n");
   int f[3] = {0,1,0};
   int i;
   for(i=2;i<n;++i)

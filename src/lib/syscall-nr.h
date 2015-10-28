@@ -28,7 +28,11 @@ enum
     SYS_MKDIR,                  /* Create a directory. */
     SYS_READDIR,                /* Reads a directory entry. */
     SYS_ISDIR,                  /* Tests if a fd represents a directory. */
-    SYS_INUMBER                 /* Returns the inode number for a fd. */
+    SYS_INUMBER,                /* Returns the inode number for a fd. */
+  
+    // Project 2 custom system call
+    SYS_FIBO,                   /* Returns fibonacci number. */
+    SYS_SUM4                    /* Returns sum of four integers. */
   };
 
 #endif /* lib/syscall-nr.h */

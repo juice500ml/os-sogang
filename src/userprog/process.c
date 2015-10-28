@@ -91,8 +91,7 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   // To watch for child process. To be changed after.
-  int i=0,j=0;
-  for(i=0;i<200000000;++i) j += i;
+  while(1);
   return -1;
 }
 
