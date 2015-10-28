@@ -88,11 +88,26 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  // To watch for child process. To be changed after.
-  while(1);
-  return -1;
+  struct thread *parent = thread_current();
+  struct thread *child = NULL;
+  int return_status = -1;
+  struct list_elem *e;
+  for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e = list_next(e))
+    {
+      child = list_entry(e, struct thread, childelem);
+      if(child->tid == child_tid) break;
+      child = NULL;
+    }
+  if(child==NULL) return -1;
+ 
+  // sema_up in syscall_exit
+  sema_down(&parent->sema);
+  list_remove(&child->childelem);
+  return_status = child->return_status;
+  
+  return return_status;
 }
 
 /* Free the current process's resources. */
@@ -419,7 +434,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
      it then user code that passed a null pointer to system calls
      could quite likely panic the kernel by way of null pointer
      assertions in memcpy(), etc. */
-  if (phdr->p_offset < PGSIZE)
+  if (phdr->p_vaddr < PGSIZE)
     return false;
 
   /* It's okay. */

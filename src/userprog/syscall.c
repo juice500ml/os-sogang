@@ -7,6 +7,8 @@
 #include "lib/kernel/list.h"
 #include "devices/input.h"
 #include "threads/vaddr.h"
+#include "devices/shutdown.h"
+#include "process.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -19,80 +21,63 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  printf("HANDLER\n");
   int syscall_number = *((int*)f->esp);
   // unknown issue: bit shifted 16 bits. don't know why.
   void *esp = f->esp + 16;
   switch(syscall_number)
   {
     case  SYS_HALT  : syscall_halt(); break;
-    case  SYS_EXIT  : syscall_exit(*(int*)(esp+4)); break;
-    case  SYS_EXEC  : break;
-    case  SYS_WAIT  : break;
+    case  SYS_EXIT  : syscall_exit(*(int*)(f->esp+4)); break;
+    case  SYS_EXEC  : f->eax = syscall_exec(*(const char**)(f->esp+4)); break;
+    case  SYS_WAIT  : syscall_wait(*(pid_t*)(f->esp+4)); break;
     case  SYS_READ  : f->eax = syscall_read(*(int*)(esp+4),
                                        *(void**)(esp+8),
                                        *(unsigned*)(esp+12)); break;
     case  SYS_WRITE : f->eax = syscall_write(*(int*)(esp+4),
                                        *(const void**)(esp+8),
                                        *(unsigned*)(esp+12)); break;
-    case  SYS_FIBO  : f->eax = syscall_fibonacci(*(int*)(esp+4)); break;
-    case  SYS_SUM4  : f->eax = *(int*)(esp+4)
-                        + *(int*)(esp+8)
-                        + *(int*)(esp+12)
-                        + *(int*)(esp+16); break;
+    case  SYS_FIBO  : f->eax = syscall_fibonacci(*(int*)(f->esp+4)); break;
+    case  SYS_SUM4  : f->eax = syscall_sum_of_four_integers(*(int*)(esp+8), *(int*)(esp+12), *(int*)(esp+16), *(int*)(esp+20)); break;
     default   : syscall_exit(-1);
   }
-}
-
-// 3.1.5 accessing user memory: p.27 example code
-int
-read_byte (const uint8_t *uaddr)
-{
-  int result;
-  asm ("movl $1f, %0; movzbl %1, %0; 1:"
-      : "=&a" (result) : "m" (*uaddr));
-  return result;
-}
-
-// 3.1.5 accessing user memory: p.27 example code
-bool
-write_byte (uint8_t *udst, uint8_t byte)
-{
-  int error_code;
-  asm ("movl $1f, %0; movb %b2, %1; 1:"
-      : "=&a" (error_code), "=m" (*udst) : "q" (byte));
-  return error_code != -1;
 }
 
 void
 syscall_halt (void)
 {
-
+  shutdown_power_off();
 }
 
 void
 syscall_exit (int status)
 {
   int i;
-  char *name = thread_current()->name;
+  struct thread *current = thread_current();
+  char *name = current->name;
   for(i=0;i<16;++i)
     if(name[i]==' ') break;
   name[i] = '\0';
-  printf("%s: exit(%d)\n", thread_current()->name, status);
+  printf("%s: exit(%d)\n", current->name, status);
+  current->return_status = status;
+  sema_up(&current->parent->sema);
+  printf("sema normal!\n");
   thread_exit();
+  printf("syscall_exit normal!\n");
   return;
 }
 
 pid_t
-syscall_exec (const char *cmdline UNUSED)
+syscall_exec (const char *cmdline)
 {
-
+  if(!is_user_vaddr(cmdline))
+    syscall_exit(-1);
+  return process_execute(cmdline);
 }
 
 int
-syscall_wait (pid_t pid UNUSED)
+syscall_wait (pid_t pid)
 {
-
+  return process_wait(pid);
 }
 
 int
@@ -129,10 +114,16 @@ syscall_write (int fd, const void *buf, unsigned size)
 int
 syscall_fibonacci (int n)
 {
-  printf("FIBO IN\n");
   int f[3] = {0,1,0};
   int i;
-  for(i=2;i<n;++i)
+  for(i=2;i<=n;++i)
     f[n%3] = f[(n+1)%3] + f[(n+2)%3];
+  printf("%d:result\n",f[n%3]);
   return f[n%3];
+}
+
+int
+syscall_sum_of_four_integers (int a, int b, int c, int d)
+{
+  return a+b+c+d;
 }

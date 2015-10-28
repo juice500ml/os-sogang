@@ -16,5 +16,6 @@ int syscall_wait (pid_t pid);
 int syscall_read (int fd, void *buf, unsigned size);
 int syscall_write (int fd, const void *buf, unsigned size);
 int syscall_fibonacci (int n);
+int syscall_sum_of_four_integers (int a, int b, int c, int d);
 
 #endif /* userprog/syscall.h */
