@@ -117,8 +117,7 @@ syscall_fibonacci (int n)
   int f[3] = {0,1,0};
   int i;
   for(i=2;i<=n;++i)
-    f[n%3] = f[(n+1)%3] + f[(n+2)%3];
-  printf("%d:result\n",f[n%3]);
+    f[i%3] = f[(i+1)%3] + f[(i+2)%3];
   return f[n%3];
 }
 
