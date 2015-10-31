@@ -38,7 +38,7 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-
+//printf("process.c: process_execute %s\n",file_name);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -54,7 +54,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-
+//printf("start_process %s\n",file_name_);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -92,7 +92,6 @@ process_wait (tid_t child_tid)
 {
   struct thread *parent = thread_current();
   struct thread *child = NULL;
-  int return_status = -1;
   struct list_elem *e;
   for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e = list_next(e))
     {
@@ -103,23 +102,15 @@ process_wait (tid_t child_tid)
 
   if(child==NULL) return -1;
  
-  // sema_up in thread_exit
-  printf("%s with %s sema_down process_wait!\n",parent->name,child?child->name:"NULL");
-  list_remove(&child->childelem);
-  if(child->status!= THREAD_DYING)
-    {
-      sema_down(&parent->sema);
-      printf("%s with %s sema_down clear process_wait!\n",parent->name,child?child->name:"NULL");
-      return_status = child->return_status;
-    }
-  else
-    {
-      printf("TOO FAST!\n");
-      return_status = -1;
-    }
-  //printf("%s removed %s in process_wait!\n",parent->name,child?child->name:"NULL");
-  
-  return return_status;
+  // printf("%s with %s sema_down process_wait!\n",parent->name,child?child->name:"NULL");
+  parent->waiting_tid = child->tid;
+ // printf("%s(child:%s): lock_acquire by parent\n",parent->name,child->name);
+  sema_down(&parent->sema);
+//  printf("%s: lock_acquire released in parent\n",parent->name);
+ // list_remove(&child->childelem);
+ // return_status = child->return_status;
+//  printf("%s removed %s in process_wait!\n",parent->name,child?child->name:"NULL");
+  return parent->return_status;
 }
 
 /* Free the current process's resources. */

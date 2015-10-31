@@ -24,6 +24,7 @@ syscall_handler (struct intr_frame *f)
   int syscall_number = *((int*)f->esp);
   // unknown issue: bit shifted 16 bits. don't know why.
   void *esp = f->esp + 16;
+//  hex_dump((int)f->esp,f->esp,100,true);
   switch(syscall_number)
   {
     case  SYS_HALT  : syscall_halt(); break;
@@ -57,13 +58,6 @@ syscall_exit (int status)
   for(i=0;i<16;++i)
     if(name[i]==' ') break;
   name[i] = '\0';
-  printf("%s: exit(%d)\n", current->name, status);
-  current->return_status = status;
- // printf("%s sema_up thread_exit\n",current->name);
-  sema_up(&current->parent->sema);
-  printf("%s sema_down clear thread_exit\n",current->name);
-  //sema_down(&current->parent->sema);
-  //printf("%s sema_down clear thread_exit\n",current->name);
 
   struct list_elem *e;
   for(e=list_begin(&current->childlist); e!=list_end(&current->childlist); e = list_next(e))
@@ -74,6 +68,20 @@ syscall_exit (int status)
       while(child->status!=THREAD_DYING)
         process_wait(child->tid);
     }
+
+  printf("%s: exit(%d)\n", current->name, status);
+  current->parent->return_status = status;
+  // wait for parent
+  //while(!lock_try_acquire(&current->parent->lock));
+//  printf("%s lock clear thread_exit\n",current->name);
+  if(current->parent->waiting_tid==current->tid)
+    {
+      list_remove(&current->childelem);
+      sema_up(&current->parent->sema);
+    }
+  
+  //printf("%s sema_down clear thread_exit\n",current->name);
+
 //  printf("syscall_exit calls thread_exit!!\n"); 
   thread_exit();
 //  printf("syscall_exit normal!\n");
