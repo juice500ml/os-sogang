@@ -100,12 +100,24 @@ process_wait (tid_t child_tid)
       if(child->tid == child_tid) break;
       child = NULL;
     }
+
   if(child==NULL) return -1;
  
-  // sema_up in syscall_exit
-  sema_down(&parent->sema);
+  // sema_up in thread_exit
+  printf("%s with %s sema_down process_wait!\n",parent->name,child?child->name:"NULL");
   list_remove(&child->childelem);
-  return_status = child->return_status;
+  if(child->status!= THREAD_DYING)
+    {
+      sema_down(&parent->sema);
+      printf("%s with %s sema_down clear process_wait!\n",parent->name,child?child->name:"NULL");
+      return_status = child->return_status;
+    }
+  else
+    {
+      printf("TOO FAST!\n");
+      return_status = -1;
+    }
+  //printf("%s removed %s in process_wait!\n",parent->name,child?child->name:"NULL");
   
   return return_status;
 }
@@ -116,7 +128,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+//printf("process_exit called~\n");
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -133,6 +145,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  //printf("pagedir destroyed!\n");
 }
 
 /* Sets up the CPU for running user code in the current

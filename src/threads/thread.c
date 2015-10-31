@@ -208,9 +208,13 @@ thread_create (const char *name, int priority,
 
   // Project 2 init thread
   struct thread *parent = thread_current();
-  list_push_back(&parent->childlist, &t->childelem);
-  t->parent = parent;
-  
+  // if(!(t->name[0]=='i'&&t->name[1]=='d'&&t->name[2]=='l'&&t->name[3]=='e'&&t->name[4]=='\0'))
+    {
+      //printf("%s:parent, %s:child\n",parent->name, t->name);
+      list_push_back(&parent->childlist, &t->childelem);
+      t->parent = parent;
+    }
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -300,13 +304,10 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
-  intr_disable ();
-  list_remove (&thread_current()->allelem);
-  printf("%s list removed!\n",thread_current()->name);
+  intr_disable (); //printf("intr disabled!\n");
+  list_remove (&thread_current()->allelem); //printf("list removed!\n");
   thread_current ()->status = THREAD_DYING;
-  printf("threadcurrent normal!\n"); 
-  // thread_current()->status 에서인가? 누군가 먼저 죽였나?
-  schedule ();
+  schedule (); //printf("scheduled!\n");
   NOT_REACHED ();
 }
 

@@ -59,10 +59,24 @@ syscall_exit (int status)
   name[i] = '\0';
   printf("%s: exit(%d)\n", current->name, status);
   current->return_status = status;
+ // printf("%s sema_up thread_exit\n",current->name);
   sema_up(&current->parent->sema);
-  printf("sema normal!\n");
+  printf("%s sema_down clear thread_exit\n",current->name);
+  //sema_down(&current->parent->sema);
+  //printf("%s sema_down clear thread_exit\n",current->name);
+
+  struct list_elem *e;
+  for(e=list_begin(&current->childlist); e!=list_end(&current->childlist); e = list_next(e))
+    {
+     // printf("%s!!!!!\n",current->name);
+      struct thread *child = list_entry(e, struct thread, childelem);
+     // printf("waiting %s from %s!\n",current->name,child->name);
+      while(child->status!=THREAD_DYING)
+        process_wait(child->tid);
+    }
+//  printf("syscall_exit calls thread_exit!!\n"); 
   thread_exit();
-  printf("syscall_exit normal!\n");
+//  printf("syscall_exit normal!\n");
   return;
 }
 
