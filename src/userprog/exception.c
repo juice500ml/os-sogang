@@ -162,7 +162,7 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);
 */
-  // userprog
+  // Project 2. if weird pointer comes in, just exit.
   syscall_exit(-1);
 }
 
