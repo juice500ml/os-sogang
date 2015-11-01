@@ -40,9 +40,19 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 //printf("process.c: process_execute %s\n",file_name);
   /* Create a new thread to execute FILE_NAME. */
+  struct thread *parent = thread_current();
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+//  printf("sema down from %s!\n",parent->name);
+  if(tid!=TID_ERROR)
+    {
+//      printf("sema_down ok!\n");
+      sema_down(&parent->exec_sema);
+    }
+//  if(tid==TID_ERROR)
+ //   printf("TID_ERROR caught [%s] here!\n",file_name);
+//  printf("sema down from %s clear!\n",parent->name);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
   return tid;
 }
 
@@ -54,7 +64,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-//printf("start_process %s\n",file_name_);
+//printf("start_process %s\n",file_name);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -63,11 +73,18 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+//  printf("thread_current is %s!\n",thread_current()->name);
+//  printf("[%s]sema_up from start_process, but sema down is %d\n",file_name, sema_try_down(&thread_current()->parent->sema));
+  // for sys_exec
+  if(!success)
+    list_remove(&thread_current()->childelem);
+  sema_up(&thread_current()->parent->exec_sema);
+  thread_yield();
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
-
+  
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -90,26 +107,28 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
+//  printf("process_wait came inside! child id is %d\n",child_tid);
   struct thread *parent = thread_current();
+//  printf("thread_current() dead?!\n");
   struct thread *child = NULL;
   struct list_elem *e;
   for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e = list_next(e))
     {
       child = list_entry(e, struct thread, childelem);
+//      printf("list traverse of %s(%s)\n",parent->name,child->name);
       if(child->tid == child_tid) break;
       child = NULL;
     }
-
+//  if(child==NULL) printf("child(%d) for parent[%s] is null!?\n",child_tid, parent->name);
   if(child==NULL) return -1;
- 
+//  printf("process_wait of %s for %s(child)!\n",parent->name,child->name); 
   // printf("%s with %s sema_down process_wait!\n",parent->name,child?child->name:"NULL");
   parent->waiting_tid = child->tid;
- // printf("%s(child:%s): lock_acquire by parent\n",parent->name,child->name);
+//  printf("%s(child:%s): lock_acquire by parent\n",parent->name,child->name);
   sema_down(&parent->sema);
-//  printf("%s: lock_acquire released in parent\n",parent->name);
+//  printf("%s: sema_down released in parent\n",parent->name);
  // list_remove(&child->childelem);
- // return_status = child->return_status;
-//  printf("%s removed %s in process_wait!\n",parent->name,child?child->name:"NULL");
+ // printf("%s removed in process_wait, status:%d(pid=%d)\n",parent->name,parent->return_status,child_tid);
   return parent->return_status;
 }
 

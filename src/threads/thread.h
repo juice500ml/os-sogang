@@ -98,6 +98,7 @@ struct thread
     struct list_elem childelem;
     struct thread *parent;
     struct semaphore sema;
+    struct semaphore exec_sema;
     tid_t waiting_tid;
     int return_status;
 

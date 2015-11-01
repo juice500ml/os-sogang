@@ -21,25 +21,38 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
+//  printf("%p!!(%p is PHYS_BASE)!!\n",f->esp,PHYS_BASE);
+  if(f->esp==NULL || !is_user_vaddr(f->esp))
+    syscall_exit(-1);
   int syscall_number = *((int*)f->esp);
-  // unknown issue: bit shifted 16 bits. don't know why.
-  void *esp = f->esp + 16;
+//  printf("%p!!!\n",f->esp);
+  // unknown issue: bit shifted 16 bits(3 param), 20 bits(4 param). don't know why.
 //  hex_dump((int)f->esp,f->esp,100,true);
   switch(syscall_number)
   {
     case  SYS_HALT  : syscall_halt(); break;
-    case  SYS_EXIT  : syscall_exit(*(int*)(f->esp+4)); break;
-    case  SYS_EXEC  : f->eax = syscall_exec(*(const char**)(f->esp+4)); break;
-    case  SYS_WAIT  : syscall_wait(*(pid_t*)(f->esp+4)); break;
-    case  SYS_READ  : f->eax = syscall_read(*(int*)(esp+4),
-                                       *(void**)(esp+8),
-                                       *(unsigned*)(esp+12)); break;
-    case  SYS_WRITE : f->eax = syscall_write(*(int*)(esp+4),
-                                       *(const void**)(esp+8),
-                                       *(unsigned*)(esp+12)); break;
-    case  SYS_FIBO  : f->eax = syscall_fibonacci(*(int*)(f->esp+4)); break;
-    case  SYS_SUM4  : f->eax = syscall_sum_of_four_integers(*(int*)(esp+8), *(int*)(esp+12), *(int*)(esp+16), *(int*)(esp+20)); break;
-    default   : syscall_exit(-1);
+    case  SYS_EXIT  : if(!is_user_vaddr(f->esp+4)) syscall_exit(-1);
+                      syscall_exit(*(int*)(f->esp+4)); break;
+    case  SYS_EXEC  : if(!is_user_vaddr(f->esp+4)) syscall_exit(-1);
+                      f->eax = syscall_exec(*(const char**)(f->esp+4)); break;
+    case  SYS_WAIT  : if(!is_user_vaddr(f->esp+4)) syscall_exit(-1);
+                      f->eax = syscall_wait(*(pid_t*)(f->esp+4)); break;
+    case  SYS_READ  : if(!is_user_vaddr(f->esp+16+12)) syscall_exit(-1);
+                      f->eax = syscall_read(*(int*)(f->esp+16+4),
+                                       *(void**)(f->esp+16+8),
+                                       *(unsigned*)(f->esp+16+12)); break;
+    case  SYS_WRITE : if(!is_user_vaddr(f->esp+16+12)) syscall_exit(-1);
+                      f->eax = syscall_write(*(int*)(f->esp+16+4),
+                                       *(const void**)(f->esp+16+8),
+                                       *(unsigned*)(f->esp+16+12)); break;
+    case  SYS_FIBO  : if(!is_user_vaddr(f->esp+4)) syscall_exit(-1);
+                      f->eax = syscall_fibonacci(*(int*)(f->esp+4)); break;
+    case  SYS_SUM4  : if(!is_user_vaddr(f->esp+20+16)) syscall_exit(-1);
+                      f->eax = syscall_sum_of_four_integers(*(int*)(f->esp+20+4),
+                                                            *(int*)(f->esp+20+8),
+                                                            *(int*)(f->esp+20+12),
+                                                            *(int*)(f->esp+20+16)); break;
+    default         : syscall_exit(-1);
   }
 }
 
@@ -93,12 +106,16 @@ syscall_exec (const char *cmdline)
 {
   if(!is_user_vaddr(cmdline))
     syscall_exit(-1);
-  return process_execute(cmdline);
+  int pid = process_execute(cmdline);
+//  printf("%s(%d) execute success!\n",cmdline,pid);
+  return pid;
 }
 
 int
 syscall_wait (pid_t pid)
 {
+//  printf("%s(%d) syscall_wait!\n",thread_current()->name,pid);
+//  printf("%s(%d) syscall_wait done:%d!\n",thread_current()->name,pid,ret);
   return process_wait(pid);
 }
 
