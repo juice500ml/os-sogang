@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -38,22 +39,27 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-//printf("process.c: process_execute %s\n",file_name);
+
   /* Create a new thread to execute FILE_NAME. */
   struct thread *parent = thread_current();
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-//  printf("sema down from %s!\n",parent->name);
-  if(tid!=TID_ERROR)
-    {
-//      printf("sema_down ok!\n");
-      sema_down(&parent->exec_sema);
-    }
-//  if(tid==TID_ERROR)
- //   printf("TID_ERROR caught [%s] here!\n",file_name);
-//  printf("sema down from %s clear!\n",parent->name);
+
+  if(tid != TID_ERROR)
+    sema_down(&parent->exec_sema);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  return tid;
+  
+  // if this thread is invalidated in start_process, it is not in the child list.
+  struct list_elem *e;
+  for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e=list_next(e))
+    {
+      struct thread *child = list_entry(e, struct thread, childelem);
+      // tid is found in list. normal thread.
+      if(child->tid == tid)
+        return tid;
+    }
+  // tid is not found in list.
+  return TID_ERROR;
 }
 
 /* A thread function that loads a user process and starts it
@@ -76,14 +82,17 @@ start_process (void *file_name_)
 //  printf("thread_current is %s!\n",thread_current()->name);
 //  printf("[%s]sema_up from start_process, but sema down is %d\n",file_name, sema_try_down(&thread_current()->parent->sema));
   // for sys_exec
-  if(!success)
-    list_remove(&thread_current()->childelem);
+  
   sema_up(&thread_current()->parent->exec_sema);
-  thread_yield();
-  /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+
+  /* If load failed, quit. */ 
+  if(!success)
+    {
+      list_remove(&thread_current()->childelem);
+      syscall_exit(-1);
+    }
+   // thread_exit ();
   
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

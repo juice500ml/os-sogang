@@ -106,9 +106,7 @@ syscall_exec (const char *cmdline)
 {
   if(!is_user_vaddr(cmdline))
     syscall_exit(-1);
-  int pid = process_execute(cmdline);
-//  printf("%s(%d) execute success!\n",cmdline,pid);
-  return pid;
+  return process_execute(cmdline);
 }
 
 int
