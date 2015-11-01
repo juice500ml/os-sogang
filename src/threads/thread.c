@@ -301,10 +301,10 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
-  intr_disable (); //printf("intr disabled!\n");
-  list_remove (&thread_current()->allelem); //printf("list removed!\n");
+  intr_disable ();
+  list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
-  schedule (); //printf("scheduled!\n");
+  schedule ();
   NOT_REACHED ();
 }
 
