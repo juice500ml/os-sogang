@@ -21,13 +21,12 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-//  printf("%p!!(%p is PHYS_BASE)!!\n",f->esp,PHYS_BASE);
   if(f->esp==NULL || !is_user_vaddr(f->esp))
     syscall_exit(-1);
-  int syscall_number = *((int*)f->esp);
-//  printf("%p!!!\n",f->esp);
+  
+  // TODO: clean up this mess.
   // unknown issue: bit shifted 16 bits(3 param), 20 bits(4 param). don't know why.
-//  hex_dump((int)f->esp,f->esp,100,true);
+  int syscall_number = *((int*)f->esp);
   switch(syscall_number)
   {
     case  SYS_HALT  : syscall_halt(); break;
@@ -59,7 +58,9 @@ syscall_handler (struct intr_frame *f)
 void
 syscall_halt (void)
 {
+  // 3.3.4 description from 3.3.4 System Calls void halt(void).
   shutdown_power_off();
+  return;
 }
 
 void
@@ -68,36 +69,33 @@ syscall_exit (int status)
   int i;
   struct thread *current = thread_current();
   char *name = current->name;
+
+  // name has all the parameters too, so ignore others.
   for(i=0;i<16;++i)
     if(name[i]==' ') break;
   name[i] = '\0';
 
+  // traverse through child list to wait for child before exit.
   struct list_elem *e;
   for(e=list_begin(&current->childlist); e!=list_end(&current->childlist); e = list_next(e))
     {
-     // printf("%s!!!!!\n",current->name);
       struct thread *child = list_entry(e, struct thread, childelem);
-     // printf("waiting %s from %s!\n",current->name,child->name);
       while(child->status!=THREAD_DYING)
         process_wait(child->tid);
     }
 
+  // exit print.
   printf("%s: exit(%d)\n", current->name, status);
-  current->parent->return_status = status;
-  // wait for parent
-  //while(!lock_try_acquire(&current->parent->lock));
-//  printf("%s lock clear thread_exit\n",current->name);
+  // let parent know its status. then notify.
   if(current->parent->waiting_tid==current->tid)
     {
+      current->parent->return_status = status;
       list_remove(&current->childelem);
       sema_up(&current->parent->sema);
     }
   
-  //printf("%s sema_down clear thread_exit\n",current->name);
-
-//  printf("syscall_exit calls thread_exit!!\n"); 
+  // call thread_exit to clean.
   thread_exit();
-//  printf("syscall_exit normal!\n");
   return;
 }
 
@@ -112,8 +110,6 @@ syscall_exec (const char *cmdline)
 int
 syscall_wait (pid_t pid)
 {
-//  printf("%s(%d) syscall_wait!\n",thread_current()->name,pid);
-//  printf("%s(%d) syscall_wait done:%d!\n",thread_current()->name,pid,ret);
   return process_wait(pid);
 }
 
@@ -122,6 +118,7 @@ syscall_read (int fd, void *buf, unsigned size)
 {
   if(!is_user_vaddr(buf) || !is_user_vaddr(buf+size))
     syscall_exit(-1);
+  // stdin
   if(fd==0)
     {
       unsigned i;
@@ -137,6 +134,7 @@ syscall_write (int fd, const void *buf, unsigned size)
 {
   if(!is_user_vaddr(buf) || !is_user_vaddr(buf+size))
     syscall_exit(-1);
+  // stdout
   if(fd==1)
     {
       unsigned i;

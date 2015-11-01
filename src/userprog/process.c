@@ -44,12 +44,14 @@ process_execute (const char *file_name)
   struct thread *parent = thread_current();
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
-  if(tid != TID_ERROR)
+  // if not error, wait for child (sema_up is in start_process().)
+  if (tid != TID_ERROR)
     sema_down(&parent->exec_sema);
-  if (tid == TID_ERROR)
+  else
     palloc_free_page (fn_copy);
   
   // if this thread is invalidated in start_process, it is not in the child list.
+  // this loop is only for return of TID_ERROR.
   struct list_elem *e;
   for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e=list_next(e))
     {
@@ -70,7 +72,6 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-//printf("start_process %s\n",file_name);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -79,20 +80,19 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-//  printf("thread_current is %s!\n",thread_current()->name);
-//  printf("[%s]sema_up from start_process, but sema down is %d\n",file_name, sema_try_down(&thread_current()->parent->sema));
-  // for sys_exec
-  
+  // notify waiting parent which is waiting on process_execute().
   sema_up(&thread_current()->parent->exec_sema);
   palloc_free_page (file_name);
 
   /* If load failed, quit. */ 
   if(!success)
     {
+      // remove from child list and exit. syscall_exit has thread_exit() inside.
       list_remove(&thread_current()->childelem);
       syscall_exit(-1);
     }
-   // thread_exit ();
+  // original code:
+  // thread_exit ();
   
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -116,28 +116,25 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid) 
 {
-//  printf("process_wait came inside! child id is %d\n",child_tid);
   struct thread *parent = thread_current();
-//  printf("thread_current() dead?!\n");
   struct thread *child = NULL;
   struct list_elem *e;
+  
+  // find for child tid.
   for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e = list_next(e))
     {
       child = list_entry(e, struct thread, childelem);
-//      printf("list traverse of %s(%s)\n",parent->name,child->name);
       if(child->tid == child_tid) break;
       child = NULL;
     }
-//  if(child==NULL) printf("child(%d) for parent[%s] is null!?\n",child_tid, parent->name);
+  // if not found, wrong child_tid.
   if(child==NULL) return -1;
-//  printf("process_wait of %s for %s(child)!\n",parent->name,child->name); 
-  // printf("%s with %s sema_down process_wait!\n",parent->name,child?child->name:"NULL");
+  
+  // save waiting_tid for child process to check and wake by sema_up.
+  // sema_up is in syscall_exit. 
   parent->waiting_tid = child->tid;
-//  printf("%s(child:%s): lock_acquire by parent\n",parent->name,child->name);
   sema_down(&parent->sema);
-//  printf("%s: sema_down released in parent\n",parent->name);
- // list_remove(&child->childelem);
- // printf("%s removed in process_wait, status:%d(pid=%d)\n",parent->name,parent->return_status,child_tid);
+  
   return parent->return_status;
 }
 
@@ -147,7 +144,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-//printf("process_exit called~\n");
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -164,7 +161,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  //printf("pagedir destroyed!\n");
 }
 
 /* Sets up the CPU for running user code in the current

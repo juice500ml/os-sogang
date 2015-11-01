@@ -207,16 +207,11 @@ thread_create (const char *name, int priority,
   intr_set_level (old_level);
 
   // Project 2 init thread
+  // add child to current thread.
   struct thread *parent = thread_current();
-  // if(!(t->name[0]=='i'&&t->name[1]=='d'&&t->name[2]=='l'&&t->name[3]=='e'&&t->name[4]=='\0'))
-    {
-      //printf("%s:parent, %s:child\n",parent->name, t->name);
-      list_push_back(&parent->childlist, &t->childelem);
-      t->parent = parent;
-    }
-  // wait for child creation to be over
-//  printf("%s(parent) %s(child) sema down!\n",parent->name,name);
-//  if(!(t->name[0]=='i'&&t->name[1]=='d'&&t->name[2]=='l'&&t->name[3]=='e'&&t->name[4]=='\0'))
+  list_push_back(&parent->childlist, &t->childelem);
+  t->parent = parent;
+  
   /* Add to run queue. */
   thread_unblock (t);
 

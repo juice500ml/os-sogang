@@ -93,11 +93,14 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    
     /* Project 2 child element list. */
     struct list childlist;
     struct list_elem childelem;
     struct thread *parent;
+    /* Project 2 wait */
     struct semaphore sema;
+    /* Project 2 exec */
     struct semaphore exec_sema;
     tid_t waiting_tid;
     int return_status;
