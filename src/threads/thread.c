@@ -206,6 +206,17 @@ thread_create (const char *name, int priority,
 
   intr_set_level (old_level);
 
+  // Project 2 init thread
+  struct thread *parent = thread_current();
+  // if(!(t->name[0]=='i'&&t->name[1]=='d'&&t->name[2]=='l'&&t->name[3]=='e'&&t->name[4]=='\0'))
+    {
+      //printf("%s:parent, %s:child\n",parent->name, t->name);
+      list_push_back(&parent->childlist, &t->childelem);
+      t->parent = parent;
+    }
+  // wait for child creation to be over
+//  printf("%s(parent) %s(child) sema down!\n",parent->name,name);
+//  if(!(t->name[0]=='i'&&t->name[1]=='d'&&t->name[2]=='l'&&t->name[3]=='e'&&t->name[4]=='\0'))
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -264,7 +275,6 @@ struct thread *
 thread_current (void) 
 {
   struct thread *t = running_thread ();
-  
   /* Make sure T is really a thread.
      If either of these assertions fire, then your thread may
      have overflowed its stack.  Each thread has less than 4 kB
@@ -293,14 +303,13 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
-
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
-  intr_disable ();
-  list_remove (&thread_current()->allelem);
+  intr_disable (); //printf("intr disabled!\n");
+  list_remove (&thread_current()->allelem); //printf("list removed!\n");
   thread_current ()->status = THREAD_DYING;
-  schedule ();
+  schedule (); //printf("scheduled!\n");
   NOT_REACHED ();
 }
 
@@ -470,6 +479,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  // Project 2. child list and sema init.
+  list_init(&t->childlist);
+  sema_init(&t->sema, 0);
+  sema_init(&t->exec_sema, 0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

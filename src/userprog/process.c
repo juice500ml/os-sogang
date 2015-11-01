@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -40,10 +41,25 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
+  struct thread *parent = thread_current();
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  if(tid != TID_ERROR)
+    sema_down(&parent->exec_sema);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
-  return tid;
+    palloc_free_page (fn_copy);
+  
+  // if this thread is invalidated in start_process, it is not in the child list.
+  struct list_elem *e;
+  for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e=list_next(e))
+    {
+      struct thread *child = list_entry(e, struct thread, childelem);
+      // tid is found in list. normal thread.
+      if(child->tid == tid)
+        return tid;
+    }
+  // tid is not found in list.
+  return TID_ERROR;
 }
 
 /* A thread function that loads a user process and starts it
@@ -54,7 +70,7 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-
+//printf("start_process %s\n",file_name);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -63,11 +79,21 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
+//  printf("thread_current is %s!\n",thread_current()->name);
+//  printf("[%s]sema_up from start_process, but sema down is %d\n",file_name, sema_try_down(&thread_current()->parent->sema));
+  // for sys_exec
+  
+  sema_up(&thread_current()->parent->exec_sema);
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
 
+  /* If load failed, quit. */ 
+  if(!success)
+    {
+      list_remove(&thread_current()->childelem);
+      syscall_exit(-1);
+    }
+   // thread_exit ();
+  
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -88,12 +114,31 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  // To watch for child process. To be changed after.
-  int i=0,j=0;
-  for(i=0;i<200000000;++i) j += i;
-  return -1;
+//  printf("process_wait came inside! child id is %d\n",child_tid);
+  struct thread *parent = thread_current();
+//  printf("thread_current() dead?!\n");
+  struct thread *child = NULL;
+  struct list_elem *e;
+  for(e=list_begin(&parent->childlist); e!=list_end(&parent->childlist); e = list_next(e))
+    {
+      child = list_entry(e, struct thread, childelem);
+//      printf("list traverse of %s(%s)\n",parent->name,child->name);
+      if(child->tid == child_tid) break;
+      child = NULL;
+    }
+//  if(child==NULL) printf("child(%d) for parent[%s] is null!?\n",child_tid, parent->name);
+  if(child==NULL) return -1;
+//  printf("process_wait of %s for %s(child)!\n",parent->name,child->name); 
+  // printf("%s with %s sema_down process_wait!\n",parent->name,child?child->name:"NULL");
+  parent->waiting_tid = child->tid;
+//  printf("%s(child:%s): lock_acquire by parent\n",parent->name,child->name);
+  sema_down(&parent->sema);
+//  printf("%s: sema_down released in parent\n",parent->name);
+ // list_remove(&child->childelem);
+ // printf("%s removed in process_wait, status:%d(pid=%d)\n",parent->name,parent->return_status,child_tid);
+  return parent->return_status;
 }
 
 /* Free the current process's resources. */
@@ -102,7 +147,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+//printf("process_exit called~\n");
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -119,6 +164,7 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  //printf("pagedir destroyed!\n");
 }
 
 /* Sets up the CPU for running user code in the current
@@ -420,7 +466,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
      it then user code that passed a null pointer to system calls
      could quite likely panic the kernel by way of null pointer
      assertions in memcpy(), etc. */
-  if (phdr->p_offset < PGSIZE)
+  if (phdr->p_vaddr < PGSIZE)
     return false;
 
   /* It's okay. */

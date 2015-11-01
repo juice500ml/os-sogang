@@ -60,6 +60,7 @@
                : "memory");                                     \
           retval;                                               \
         })
+
 /* Invokes syscall NUMBER, passing arguments ARG0, ARG1, ARG2
    and ARG3, and returns the return value as an `int'. */
 #define syscall4(NUMBER, ARG0, ARG1, ARG2, ARG3)                \

@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -92,6 +93,14 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    /* Project 2 child element list. */
+    struct list childlist;
+    struct list_elem childelem;
+    struct thread *parent;
+    struct semaphore sema;
+    struct semaphore exec_sema;
+    tid_t waiting_tid;
+    int return_status;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
