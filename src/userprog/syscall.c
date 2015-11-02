@@ -90,9 +90,9 @@ syscall_exit (int status)
   if(current->parent->waiting_tid==current->tid)
     {
       current->parent->return_status = status;
-      list_remove(&current->childelem);
       sema_up(&current->parent->sema);
     }
+    list_remove(&current->childelem);
   
   // call thread_exit to clean.
   thread_exit();
