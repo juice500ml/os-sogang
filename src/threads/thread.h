@@ -97,12 +97,14 @@ struct thread
     /* Project 2 child element list. */
     struct list childlist;
     struct list_elem childelem;
-    struct thread *parent;
+    bool is_done;
     /* Project 2 wait */
-    struct semaphore sema;
+    struct semaphore sema_wait;
     /* Project 2 exec */
-    struct semaphore exec_sema;
-    tid_t waiting_tid;
+    struct semaphore sema_exec;
+    /* Project 2 load */
+    struct semaphore sema_load;
+    struct thread *parent;
     int return_status;
 
 #ifdef USERPROG

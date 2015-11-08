@@ -211,7 +211,7 @@ thread_create (const char *name, int priority,
   struct thread *parent = thread_current();
   list_push_back(&parent->childlist, &t->childelem);
   t->parent = parent;
-  
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -477,8 +477,10 @@ init_thread (struct thread *t, const char *name, int priority)
 
   // Project 2. child list and sema init.
   list_init(&t->childlist);
-  sema_init(&t->sema, 0);
-  sema_init(&t->exec_sema, 0);
+  sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_exec, 0);
+  sema_init(&t->sema_load, 0);
+  t->is_done = false;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

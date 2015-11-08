@@ -75,25 +75,20 @@ syscall_exit (int status)
     if(name[i]==' ') break;
   name[i] = '\0';
 
-  // traverse through child list to wait for child before exit.
+  // traverse through child list to exit for child before parent exit.
   struct list_elem *e;
   for(e=list_begin(&current->childlist); e!=list_end(&current->childlist); e = list_next(e))
     {
       struct thread *child = list_entry(e, struct thread, childelem);
-      while(child->status!=THREAD_DYING)
-        process_wait(child->tid);
+      sema_up(&child->sema_wait);
     }
 
   // exit print.
   printf("%s: exit(%d)\n", current->name, status);
-  // let parent know its status. then notify.
-  if(current->parent->waiting_tid==current->tid)
-    {
-      current->parent->return_status = status;
-      sema_up(&current->parent->sema);
-    }
-    list_remove(&current->childelem);
-  
+  current->is_done = true;
+  current->return_status = status;
+  // wait for parent to take over the result
+  sema_down(&current->sema_wait);
   // call thread_exit to clean.
   thread_exit();
   return;

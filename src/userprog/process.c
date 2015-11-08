@@ -45,11 +45,12 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
   // if not error, wait for child (sema_up is in start_process().)
-  if (tid != TID_ERROR)
-    sema_down(&parent->exec_sema);
-  else
+  if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  
+
+  // wait for child to finish loading
+  sema_down(&parent->sema_load);
+
   // if this thread is invalidated in start_process, it is not in the child list.
   // this loop is only for return of TID_ERROR.
   struct list_elem *e;
@@ -58,7 +59,11 @@ process_execute (const char *file_name)
       struct thread *child = list_entry(e, struct thread, childelem);
       // tid is found in list. normal thread.
       if(child->tid == tid)
-        return tid;
+        {
+          // notice child to start process.
+          sema_up(&child->sema_exec);
+          return tid;
+        }
     }
   // tid is not found in list.
   return TID_ERROR;
@@ -80,20 +85,25 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  // notify waiting parent which is waiting on process_execute().
-  sema_up(&thread_current()->parent->exec_sema);
   palloc_free_page (file_name);
 
   /* If load failed, quit. */ 
   if(!success)
     {
-      // remove from child list and exit. syscall_exit has thread_exit() inside.
+      // remove the element from parent list
       list_remove(&thread_current()->childelem);
-      syscall_exit(-1);
+      // notify parent it is done
+      sema_up(&thread_current()->parent->sema_load);
+      thread_exit ();
     }
-  // original code:
-  // thread_exit ();
-  
+  else
+    {
+      // notify parent it is done
+      sema_up(&thread_current()->parent->sema_load);
+      // wait for parent to finish checking
+      sema_down(&thread_current()->sema_exec);
+    }
+ 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -130,12 +140,14 @@ process_wait (tid_t child_tid)
   // if not found, wrong child_tid.
   if(child==NULL) return -1;
   
-  // save waiting_tid for child process to check and wake by sema_up.
-  // sema_up is in syscall_exit. 
-  parent->waiting_tid = child->tid;
-  sema_down(&parent->sema);
+  // wait for child to exit
+  while(!child->is_done) thread_yield();
+  int return_status = child->return_status;
+  list_remove(&child->childelem);
+  // return status get. free waiting child
+  sema_up(&child->sema_wait);
   
-  return parent->return_status;
+  return return_status;
 }
 
 /* Free the current process's resources. */
@@ -144,7 +156,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
