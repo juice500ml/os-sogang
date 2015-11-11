@@ -93,7 +93,11 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    
+   
+    /* Project 2 file descriptor list. */
+    struct list filelist;
+    int nextfd;
+
     /* Project 2 child element list. */
     struct list childlist;
     struct list_elem childelem;
@@ -115,6 +119,14 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+struct filewrapper
+  {
+    struct file *f;
+    int fd;
+    struct list_elem fileelem;
+  };
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

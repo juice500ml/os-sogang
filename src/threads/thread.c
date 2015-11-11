@@ -481,6 +481,9 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_exec, 0);
   sema_init(&t->sema_load, 0);
   t->is_done = false;
+  // Project 2. file descriptor init
+  list_init(&t->filelist);
+  t->nextfd = 2;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

@@ -9,6 +9,9 @@
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 #include "process.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+#include "threads/malloc.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -72,6 +75,29 @@ syscall_handler (struct intr_frame *f)
   }
 }
 
+// finder for file in list
+static struct file *
+find_file (int fd)
+{
+  struct thread *current = thread_current();
+  struct list_elem *e, *found = NULL;
+
+  // look for fd in filelist
+  for(e=list_begin(&current->filelist); e!=list_end(&current->filelist); e = list_next(e))
+    {
+      if(list_entry(e, struct filewrapper, fileelem)->fd==fd)
+        {
+          found = e;
+          break;
+        }
+    }
+  // not found
+  if(found == NULL) return NULL;
+
+  return list_entry(found, struct filewrapper, fileelem)->f;
+
+}
+
 void
 syscall_halt (void)
 {
@@ -128,25 +154,45 @@ syscall_wait (pid_t pid)
 bool
 syscall_create (const char *file, unsigned initial_size)
 {
+  if(!is_user_vaddr(file))
+    syscall_exit(-1);
   return filesys_create(file, initial_size);
 }
 
 bool
 syscall_remove (const char *file)
 {
+  if(!is_user_vaddr(file))
+    syscall_exit(-1);
   return filesys_remove(file);
 }
 
 int
 syscall_open (const char *file)
 {
-  return filesys_open(file);
+  if(!is_user_vaddr(file))
+    syscall_exit(-1);
+  
+  struct file *f = filesys_open(file);
+  // open failed
+  if (f==NULL) return -1;
+  
+  struct thread *t = thread_current();
+  struct filewrapper *fw = malloc(sizeof(struct filewrapper));
+  
+  fw->f = f;
+  fw->fd = t->nextfd++;
+  
+  list_push_back(&t->filelist, &fw->fileelem);
+  return fw->fd;
 }
 
 int
 syscall_filesize (int fd)
 {
-
+  struct file *f = find_file(fd);
+  if(f==NULL) return -1;
+  return file_length(f);
 }
 
 int
@@ -161,6 +207,12 @@ syscall_read (int fd, void *buf, unsigned size)
       for(i=0;i<size;++i)
         *((uint8_t*) buf + i) = input_getc();
       return size;
+    }
+  else
+    {
+      struct file *f = find_file(fd);
+      if(f==NULL) return -1;
+      return file_read(f, buf, size);
     }
   return -1;
 }
@@ -179,25 +231,58 @@ syscall_write (int fd, const void *buf, unsigned size)
       putbuf(buf, i);
       return i;
     }
+  else
+    {
+      struct file *f = find_file(fd);
+      if(f==NULL) return -1;
+      return file_write(f, buf, size);
+    }
   return -1;
 }
 
-int
+void
 syscall_seek (int fd, unsigned position)
 {
-
+  struct file *f = find_file(fd);
+  if(f==NULL) return;
+  file_seek(f, position);
 }
 
 int
 syscall_tell (int fd)
-{
-
+{  struct file *f = find_file(fd);
+  if(f==NULL) return -1;
+  return file_tell(f);
 }
 
-int
+void
 syscall_close (int fd)
 {
-
+  struct thread *current = thread_current();
+  struct list_elem *e, *found = NULL;
+  
+  // look for fd in filelist
+  for(e=list_begin(&current->filelist); e!=list_end(&current->filelist); e = list_next(e))
+    {
+      if(list_entry(e, struct filewrapper, fileelem)->fd==fd)
+        {
+          found = e;
+          break;
+        }
+    }
+  // not found
+  if(found == NULL) return;
+  
+  // if possible, swap with last list entry
+  e = list_rbegin(&current->filelist);
+  if(e!=list_end(&current->filelist))
+    {
+      list_insert(found, e);
+      list_entry(e, struct filewrapper, fileelem)->fd = fd;
+    }
+  list_remove(found);
+  free(list_entry(found, struct filewrapper, fileelem));
+  current->nextfd--;
 }
 
 int
