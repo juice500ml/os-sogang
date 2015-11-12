@@ -196,6 +196,10 @@ syscall_open (const char *file)
   if (f==NULL) return -1;
   
   struct thread *t = thread_current();
+ 
+  // MAX FILE DESC.
+  if(t->nextfd > MAX_FILE_FD) return -1;
+  
   struct filewrapper *fw = malloc(sizeof(struct filewrapper));
   
   fw->f = f;
