@@ -28,8 +28,6 @@ syscall_handler (struct intr_frame *f)
     syscall_exit(-1);
   
   // TODO: clean up this mess.
-  // unknown issue: bit shifted 16 bits(3 param), 20 bits(4 param). don't know why.
-  // issue: check 2 param normal?
   int syscall_number = *((int*)f->esp);
   switch(syscall_number)
   {
@@ -49,14 +47,14 @@ syscall_handler (struct intr_frame *f)
                       f->eax = syscall_open(*(const char**)(f->esp+4)); break;
     case  SYS_FILESIZE  : if(!is_user_vaddr(f->esp+4)) syscall_exit(-1);
                       f->eax = syscall_filesize(*(int*)(f->esp+4)); break;
-    case  SYS_READ  : if(!is_user_vaddr(f->esp+16+12)) syscall_exit(-1);
-                      f->eax = syscall_read(*(int*)(f->esp+16+4),
-                                       *(void**)(f->esp+16+8),
-                                       *(unsigned*)(f->esp+16+12)); break;
-    case  SYS_WRITE : if(!is_user_vaddr(f->esp+16+12)) syscall_exit(-1);
-                      f->eax = syscall_write(*(int*)(f->esp+16+4),
-                                       *(const void**)(f->esp+16+8),
-                                       *(unsigned*)(f->esp+16+12)); break;
+    case  SYS_READ  : if(!is_user_vaddr(f->esp+12)) syscall_exit(-1);
+                      f->eax = syscall_read(*(int*)(f->esp+4),
+                                       *(void**)(f->esp+8),
+                                       *(unsigned*)(f->esp+12)); break;
+    case  SYS_WRITE : if(!is_user_vaddr(f->esp+12)) syscall_exit(-1);
+                      f->eax = syscall_write(*(int*)(f->esp+4),
+                                       *(const void**)(f->esp+8),
+                                       *(unsigned*)(f->esp+12)); break;
     case  SYS_SEEK  : if(!is_user_vaddr(f->esp+8)) syscall_exit(-1);
                       syscall_seek(*(int*)(f->esp+4),
                                    *(unsigned*)(f->esp+8)); break;
@@ -66,11 +64,11 @@ syscall_handler (struct intr_frame *f)
                       syscall_close(*(int*)(f->esp+4)); break;
     case  SYS_FIBO  : if(!is_user_vaddr(f->esp+4)) syscall_exit(-1);
                       f->eax = syscall_fibonacci(*(int*)(f->esp+4)); break;
-    case  SYS_SUM4  : if(!is_user_vaddr(f->esp+20+16)) syscall_exit(-1);
-                      f->eax = syscall_sum_of_four_integers(*(int*)(f->esp+20+4),
-                                                            *(int*)(f->esp+20+8),
-                                                            *(int*)(f->esp+20+12),
-                                                            *(int*)(f->esp+20+16)); break;
+    case  SYS_SUM4  : if(!is_user_vaddr(f->esp+16)) syscall_exit(-1);
+                      f->eax = syscall_sum_of_four_integers(*(int*)(f->esp+4),
+                                                            *(int*)(f->esp+8),
+                                                            *(int*)(f->esp+12),
+                                                            *(int*)(f->esp+16)); break;
     default         : syscall_exit(-1);
   }
 }
@@ -154,7 +152,7 @@ syscall_wait (pid_t pid)
 bool
 syscall_create (const char *file, unsigned initial_size)
 {
-  if(!is_user_vaddr(file))
+  if(!is_user_vaddr(file) || file==NULL)
     syscall_exit(-1);
   return filesys_create(file, initial_size);
 }
@@ -170,7 +168,7 @@ syscall_remove (const char *file)
 int
 syscall_open (const char *file)
 {
-  if(!is_user_vaddr(file))
+  if(!is_user_vaddr(file) || file==NULL)
     syscall_exit(-1);
   
   struct file *f = filesys_open(file);
