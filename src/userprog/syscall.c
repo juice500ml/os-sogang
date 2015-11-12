@@ -129,6 +129,17 @@ syscall_exit (int status)
       struct thread *child = list_entry(e, struct thread, childelem);
       sema_up(&child->sema_wait);
     }
+ 
+  // clear file list
+  for(e = list_begin(&current->filelist); e!=list_end(&current->filelist);) 
+    {
+      struct filewrapper *fw = list_entry(e, struct filewrapper, fileelem);
+      struct list_elem *next = list_next(e);
+      list_remove(e);
+      file_close(fw->f);
+      free(fw);
+      e = next;
+    }
 
   // exit print.
   printf("%s: exit(%d)\n", current->name, status);
@@ -320,7 +331,7 @@ syscall_close (int fd)
   
   // if possible, swap with last list entry
   e = list_rbegin(&current->filelist);
-  if(e!=list_end(&current->filelist))
+  if(e!=list_rend(&current->filelist) && e!=found)
     {
       list_insert(found, e);
       list_entry(e, struct filewrapper, fileelem)->fd = fd;
