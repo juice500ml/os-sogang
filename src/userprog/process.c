@@ -85,8 +85,6 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  palloc_free_page (file_name);
-
   /* If load failed, quit. */ 
   if(!success)
     {
@@ -98,12 +96,16 @@ start_process (void *file_name_)
     }
   else
     {
+      // open file and keep for itself
+      push_back_myself(file_name);
       // notify parent it is done
       sema_up(&thread_current()->parent->sema_load);
       // wait for parent to finish checking
       sema_down(&thread_current()->sema_exec);
     }
  
+  palloc_free_page (file_name);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its

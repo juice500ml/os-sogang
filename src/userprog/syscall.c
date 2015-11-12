@@ -356,3 +356,29 @@ syscall_sum_of_four_integers (int a, int b, int c, int d)
 {
   return a+b+c+d;
 }
+
+void
+push_back_myself (char *file)
+{
+  lock_acquire(&filelock);  
+  struct file *f = filesys_open(file);
+  lock_release(&filelock);
+  
+  // open failed
+  if (f==NULL) return;
+  // deny writing myself
+  file_deny_write(f);
+  
+  struct thread *t = thread_current();
+ 
+  // MAX FILE DESC.
+  if(t->nextfd > MAX_FILE_FD) return;
+  
+  struct filewrapper *fw = malloc(sizeof(struct filewrapper));
+  
+  fw->f = f;
+  fw->fd = t->nextfd++;
+  
+  list_push_back(&t->filelist, &fw->fileelem);
+}
+
