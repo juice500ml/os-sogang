@@ -12,12 +12,18 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
+// find file in filelist of current thread and return
+static struct file *find_file (int fd);
+// used lock for file synch
+static struct lock filelock;
 
 void
 syscall_init (void) 
 {
+  lock_init(&filelock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -154,7 +160,12 @@ syscall_create (const char *file, unsigned initial_size)
 {
   if(!is_user_vaddr(file) || file==NULL)
     syscall_exit(-1);
-  return filesys_create(file, initial_size);
+  
+  lock_acquire(&filelock);  
+  bool ret = filesys_create(file, initial_size);
+  lock_release(&filelock);
+
+  return ret;
 }
 
 bool
@@ -162,16 +173,25 @@ syscall_remove (const char *file)
 {
   if(!is_user_vaddr(file))
     syscall_exit(-1);
-  return filesys_remove(file);
+  
+  lock_acquire(&filelock);  
+  bool ret = filesys_remove(file);
+  lock_release(&filelock);
+  
+  return ret;
 }
+
 
 int
 syscall_open (const char *file)
 {
   if(!is_user_vaddr(file) || file==NULL)
     syscall_exit(-1);
-  
+ 
+  lock_acquire(&filelock);  
   struct file *f = filesys_open(file);
+  lock_release(&filelock);
+  
   // open failed
   if (f==NULL) return -1;
   
@@ -190,7 +210,12 @@ syscall_filesize (int fd)
 {
   struct file *f = find_file(fd);
   if(f==NULL) return -1;
-  return file_length(f);
+  
+  lock_acquire(&filelock);  
+  int ret = file_length(f);
+  lock_release(&filelock);
+
+  return ret;
 }
 
 int
@@ -210,7 +235,12 @@ syscall_read (int fd, void *buf, unsigned size)
     {
       struct file *f = find_file(fd);
       if(f==NULL) return -1;
-      return file_read(f, buf, size);
+  
+      lock_acquire(&filelock);  
+      int ret = file_read(f, buf, size);
+      lock_release(&filelock);
+
+      return ret;
     }
   return -1;
 }
@@ -233,7 +263,12 @@ syscall_write (int fd, const void *buf, unsigned size)
     {
       struct file *f = find_file(fd);
       if(f==NULL) return -1;
-      return file_write(f, buf, size);
+      
+      lock_acquire(&filelock);  
+      int ret = file_write(f, buf, size);
+      lock_release(&filelock);
+
+      return ret;
     }
   return -1;
 }
@@ -243,14 +278,22 @@ syscall_seek (int fd, unsigned position)
 {
   struct file *f = find_file(fd);
   if(f==NULL) return;
+  
+  lock_acquire(&filelock);  
   file_seek(f, position);
+  lock_release(&filelock);
 }
 
 int
 syscall_tell (int fd)
 {  struct file *f = find_file(fd);
   if(f==NULL) return -1;
-  return file_tell(f);
+ 
+  lock_acquire(&filelock);  
+  int ret = file_tell(f);
+  lock_release(&filelock);
+  
+  return ret;
 }
 
 void
