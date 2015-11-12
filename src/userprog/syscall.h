@@ -21,6 +21,5 @@ int syscall_tell (int fd);
 void syscall_close (int fd);
 int syscall_fibonacci (int n);
 int syscall_sum_of_four_integers (int a, int b, int c, int d);
-void push_back_myself (char *file);
 
 #endif /* userprog/syscall.h */

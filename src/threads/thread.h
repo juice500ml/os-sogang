@@ -98,6 +98,9 @@ struct thread
     struct list filelist;
     int nextfd;
 
+    /* Project 2 file itself. */
+    struct file *selffile;
+
     /* Project 2 child element list. */
     struct list childlist;
     struct list_elem childelem;

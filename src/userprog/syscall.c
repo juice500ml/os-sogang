@@ -99,7 +99,6 @@ find_file (int fd)
   if(found == NULL) return NULL;
 
   return list_entry(found, struct filewrapper, fileelem)->f;
-
 }
 
 void
@@ -140,6 +139,8 @@ syscall_exit (int status)
       free(fw);
       e = next;
     }
+  // close itself
+  file_close(current->selffile);
 
   // exit print.
   printf("%s: exit(%d)\n", current->name, status);
@@ -171,8 +172,8 @@ syscall_create (const char *file, unsigned initial_size)
 {
   if(!is_user_vaddr(file) || file==NULL)
     syscall_exit(-1);
-  
-  lock_acquire(&filelock);  
+ 
+  lock_acquire(&filelock);
   bool ret = filesys_create(file, initial_size);
   lock_release(&filelock);
 
@@ -202,7 +203,7 @@ syscall_open (const char *file)
   lock_acquire(&filelock);  
   struct file *f = filesys_open(file);
   lock_release(&filelock);
-  
+ 
   // open failed
   if (f==NULL) return -1;
   
@@ -356,29 +357,3 @@ syscall_sum_of_four_integers (int a, int b, int c, int d)
 {
   return a+b+c+d;
 }
-
-void
-push_back_myself (char *file)
-{
-  lock_acquire(&filelock);  
-  struct file *f = filesys_open(file);
-  lock_release(&filelock);
-  
-  // open failed
-  if (f==NULL) return;
-  // deny writing myself
-  file_deny_write(f);
-  
-  struct thread *t = thread_current();
- 
-  // MAX FILE DESC.
-  if(t->nextfd > MAX_FILE_FD) return;
-  
-  struct filewrapper *fw = malloc(sizeof(struct filewrapper));
-  
-  fw->f = f;
-  fw->fd = t->nextfd++;
-  
-  list_push_back(&t->filelist, &fw->fileelem);
-}
-

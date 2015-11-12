@@ -97,7 +97,9 @@ start_process (void *file_name_)
   else
     {
       // open file and keep for itself
-      push_back_myself(file_name);
+      struct file *f = filesys_open(file_name);
+      file_deny_write(f);
+      thread_current()->selffile = f;
       // notify parent it is done
       sema_up(&thread_current()->parent->sema_load);
       // wait for parent to finish checking
@@ -279,15 +281,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int argc = 0;
   char *argv[128] = {NULL,}; // 128 bytes on command-line arguments.
   char *tok;
-  char *fn_copy;
   char *save_ptr;
 
-  /* Make a copy of FILE_NAME for strtok_r(). */
-  fn_copy = malloc (strlen(file_name)+1);
-  strlcpy (fn_copy, file_name, strlen(file_name)+1);
-
   /* Save every arguments in argv[], with last NULL. */
-  argv[0] = strtok_r(fn_copy," ",&save_ptr);
+  argv[0] = strtok_r((char*)file_name," ",&save_ptr);
   for(argc=1; (tok=strtok_r(NULL," ",&save_ptr))!=NULL; ++argc)
     {
       argv[argc] = tok;
@@ -396,8 +393,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
       // save ptr where argv is saved
       argv[i] = curr;
     }
-  // fn_copy not used afterwards
-  free(fn_copy);
   // word-align
   for(i=(4-align)%4; i; --i)
     {
@@ -430,6 +425,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+
   return success;
 }
 
