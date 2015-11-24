@@ -7,6 +7,8 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include <list.h>
+#include "threads/malloc.h"
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -16,6 +18,9 @@
 #if TIMER_FREQ > 1000
 #error TIMER_FREQ <= 1000 recommended
 #endif
+
+/* Blocked threads */
+static struct list blockedlist;
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
@@ -35,6 +40,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
+  list_init(&blockedlist);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -92,8 +98,17 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+
+  // wrap thread for listing
+  struct threadwrapper *tw = malloc (sizeof(struct threadwrapper));
+  tw->t = thread_current();
+  tw->wakeup_time = start + ticks;
+ 
+  // push back into blocked list and block thread
+  enum intr_level old_level = intr_disable ();
+  list_push_back(&blockedlist, &tw->threadelem);
+  thread_block();
+  intr_set_level(old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,6 +186,24 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  
+  // Search for to-be-freed thread from blockedlist
+  // Another thread can be pushed while iterating list
+  struct list_elem *e;
+  struct list_elem *begin = list_begin(&blockedlist);
+  struct list_elem *end = list_end(&blockedlist);
+  for(e = begin; e != end; ) {
+    struct list_elem *next = list_next(e);
+    struct threadwrapper *tw = list_entry(e, struct threadwrapper, threadelem);
+    if(tw->wakeup_time <= timer_ticks()) {
+        thread_unblock(tw->t);
+        enum intr_level old_level = intr_disable ();
+        list_remove(&tw->threadelem);
+        intr_set_level(old_level);
+    }
+    e = next;
+  }
+  
   thread_tick ();
 }
 
