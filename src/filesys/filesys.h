@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "filesys/off_t.h"
 
-// multi-oom max fd.
+//  maximum files that can open in a process.
 #define MAX_FILE_FD 10
 
 /* Sectors of system file inodes. */

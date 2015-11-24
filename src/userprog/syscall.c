@@ -239,6 +239,7 @@ syscall_read (int fd, void *buf, unsigned size)
 {
   if(!is_user_vaddr(buf) || !is_user_vaddr(buf+size))
     syscall_exit(-1);
+  
   // stdin
   if(fd==0)
     {
@@ -266,6 +267,7 @@ syscall_write (int fd, const void *buf, unsigned size)
 {
   if(!is_user_vaddr(buf) || !is_user_vaddr(buf+size))
     syscall_exit(-1);
+  
   // stdout
   if(fd==1)
     {
@@ -332,6 +334,7 @@ syscall_close (int fd)
   
   // if possible, swap with last list entry
   e = list_rbegin(&current->filelist);
+  // if this is the last elem, or only element, no need to push last one.
   if(e!=list_rend(&current->filelist) && e!=found)
     {
       list_insert(found, e);
