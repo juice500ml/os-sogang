@@ -138,6 +138,13 @@ struct filewrapper
     struct list_elem fileelem;
   };
 
+struct threadwrapper
+  {
+    struct thread *t;
+    int64_t wakeup_time;
+    struct list_elem threadelem;
+  };
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -155,6 +162,8 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+// Project 1. push thread to sleep
+void thread_sleep (int64_t ticks);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);

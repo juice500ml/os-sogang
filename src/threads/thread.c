@@ -14,6 +14,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "threads/malloc.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -27,6 +28,9 @@ static struct list ready_list;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+/* List of blocked threads */
+static struct list blocked_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -92,6 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&blocked_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -127,6 +132,27 @@ void
 thread_tick (void) 
 {
   struct thread *t = thread_current ();
+
+  // Search for to-be-freed thread from blocked_list
+  // Another thread can be pushed while iterating list
+  // thread wake up here
+  struct list_elem *e;
+  struct list_elem *begin = list_begin(&blocked_list);
+  struct list_elem *end = list_end(&blocked_list);
+  for(e = begin; e != end; ) {
+    struct list_elem *next = list_next(e);
+    struct threadwrapper *tw = list_entry(e, struct threadwrapper, threadelem);
+    tw->wakeup_time --;
+    if(tw->wakeup_time <= 0) {
+        thread_unblock(tw->t);
+        enum intr_level old_level = intr_disable ();
+        list_remove(&tw->threadelem);
+        intr_set_level(old_level);
+        // TODO: pool for tw
+        // free(tw);
+    }
+    e = next;
+  }
 
   /* Update statistics. */
   if (t == idle_thread)
@@ -240,6 +266,17 @@ thread_block (void)
 
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
+}
+
+void
+thread_sleep (int64_t ticks)
+{
+  // wrap thread for listing
+  struct threadwrapper *tw = malloc (sizeof(struct threadwrapper));
+  tw->t = thread_current();
+  tw->wakeup_time = ticks;
+  // block thread and push back into blocked_list
+  list_push_back(&blocked_list, &tw->threadelem);
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
