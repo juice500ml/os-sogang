@@ -98,6 +98,10 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  
+  // Project 1. nice and recent_cpu is 0 in the first thread created.
+  initial_thread->nice = 0;
+  initial_thread->recent_cpu = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -211,6 +215,10 @@ thread_create (const char *name, int priority,
   struct thread *parent = thread_current();
   list_push_back(&parent->childlist, &t->childelem);
   t->parent = parent;
+  
+  // Project 1. nice and priority value
+  t->nice = parent->nice;
+  t->recent_cpu = parent->recent_cpu;
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -389,14 +397,19 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
+  /*
+   * this has to be calculated every once per second.
   // recent_cpu and load_avg are 17.14 format fixed point number
-  static uint32_t recent_cpu;
+  uint32_t recent_cpu = thread_current()->recent_cpu;
   uint32_t load_avg = thread_get_load_avg() * FIXED_INT / 100;
   uint32_t nice = thread_get_nice() * FIXED_INT;
   recent_cpu = ((uint64_t) (2*load_avg)) * recent_cpu / FIXED_INT;
   recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2+load_avg + FIXED_INT);
   recent_cpu += nice;
+  thread_current()->recent_cpu = recent_cpu;
   return recent_cpu * 100 / FIXED_INT;
+  */
+  return thread_current()->recent_cpu;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -495,8 +508,6 @@ init_thread (struct thread *t, const char *name, int priority)
   // Project 2. file descriptor init
   list_init(&t->filelist);
   t->nextfd = 2;
-  // Project 1. nice and priority value
-  t->nice = 0;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

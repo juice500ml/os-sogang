@@ -118,7 +118,9 @@ struct thread
     int return_status;
     
     /* Project 1 nice */
-    int nice;
+    uint32_t nice;
+    /* Project 1 recent_cpu */
+    uint32_t recent_cpu;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
