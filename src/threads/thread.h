@@ -119,7 +119,7 @@ struct thread
     
     /* Project 1 nice */
     uint32_t nice;
-    /* Project 1 recent_cpu */
+    /* Project 1 recent_cpu (17.14 fixed point format) */
     uint32_t recent_cpu;
 
 #ifdef USERPROG
@@ -183,5 +183,10 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+// Project 1. thread action functions
+void thread_update_recent_cpu (struct thread *t, void *aux);
+void thread_update_priority (struct thread *t, void *aux);
+int thread_update_load_avg (bool update);
 
 #endif /* threads/thread.h */

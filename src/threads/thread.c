@@ -74,6 +74,8 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+static bool list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
+
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -153,7 +155,7 @@ thread_tick (void)
     }
     e = next;
   }
-
+  
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -409,7 +411,9 @@ thread_set_nice (int nice)
   if(nice < -20) nice = -20;
   if(nice > 20) nice = 20;
   thread_current()->nice = nice;
-  // TODO: recalculate w/ changed nice
+  thread_update_priority(thread_current(), NULL);
+  enum intr_level old_level = intr_disable ();
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's nice value. */
@@ -423,31 +427,56 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  // load_avg and ready_threads are 17.14 format fixed point number
-  static uint32_t load_avg;
-  uint32_t ready_threads = list_size(&ready_list) * FIXED_INT;
-  load_avg = (load_avg * 59 + ready_threads) / 60;
-  return load_avg * 100 / FIXED_INT;
+  return thread_update_load_avg(false) * 100 / FIXED_INT;
+
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /*
-   * this has to be calculated every once per second.
-  // recent_cpu and load_avg are 17.14 format fixed point number
-  uint32_t recent_cpu = thread_current()->recent_cpu;
-  uint32_t load_avg = thread_get_load_avg() * FIXED_INT / 100;
-  uint32_t nice = thread_get_nice() * FIXED_INT;
+  return thread_current()->recent_cpu * 100 / FIXED_INT;
+}
+
+// Project 1. update recent_cpu of thread t.
+void
+thread_update_recent_cpu (struct thread *t, void *aux UNUSED)
+{
+  // recent_cpu and load_avg are 17.14 fixed point format number
+  uint32_t recent_cpu = t->recent_cpu;
+  uint32_t load_avg = thread_update_load_avg(false);
+  uint32_t nice = t->nice * FIXED_INT;
   recent_cpu = ((uint64_t) (2*load_avg)) * recent_cpu / FIXED_INT;
   recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2+load_avg + FIXED_INT);
   recent_cpu += nice;
-  thread_current()->recent_cpu = recent_cpu;
-  return recent_cpu * 100 / FIXED_INT;
-  */
-  return thread_current()->recent_cpu;
+  t->recent_cpu = recent_cpu;
 }
+
+// Project 1. update priority of thread t.
+void
+thread_update_priority (struct thread *t, void *aux UNUSED)
+{
+  // recent_cpu is 17.14 fixed point format number
+  uint32_t recent_cpu = t->recent_cpu;
+  uint32_t nice = t->nice * FIXED_INT;
+  uint32_t priority = PRI_MAX * FIXED_INT - recent_cpu / 4 - nice * 2;
+  t->priority = priority / FIXED_INT;
+}
+
+int
+thread_update_load_avg (bool update)
+{
+  // load_avg is 17.14 fixed point format number
+  static uint32_t load_avg;
+
+  // update load_avg
+  if(update) { 
+      uint32_t ready_threads = list_size(&ready_list) * FIXED_INT;
+      load_avg = (load_avg * 59 + ready_threads) / 60;
+  }
+  return load_avg;
+}
+
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -657,6 +686,7 @@ allocate_tid (void)
   return tid;
 }
 
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
