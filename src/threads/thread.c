@@ -359,33 +359,44 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
-  /* Not yet implemented. */
+  if(nice < -20) nice = -20;
+  if(nice > 20) nice = 20;
+  thread_current()->nice = nice;
+  // TODO: recalculate w/ changed nice
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  // load_avg and ready_threads are 17.14 format fixed point number
+  static uint32_t load_avg;
+  uint32_t ready_threads = list_size(&ready_list) * FIXED_INT;
+  load_avg = (load_avg * 59 + ready_threads) / 60;
+  return load_avg * 100 / FIXED_INT;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  // recent_cpu and load_avg are 17.14 format fixed point number
+  static uint32_t recent_cpu;
+  uint32_t load_avg = thread_get_load_avg() * FIXED_INT / 100;
+  uint32_t nice = thread_get_nice() * FIXED_INT;
+  recent_cpu = ((uint64_t) (2*load_avg)) * recent_cpu / FIXED_INT;
+  recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2+load_avg + FIXED_INT);
+  recent_cpu += nice;
+  return recent_cpu * 100 / FIXED_INT;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -484,6 +495,8 @@ init_thread (struct thread *t, const char *name, int priority)
   // Project 2. file descriptor init
   list_init(&t->filelist);
   t->nextfd = 2;
+  // Project 1. nice and priority value
+  t->nice = 0;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

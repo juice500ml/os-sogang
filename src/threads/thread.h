@@ -25,6 +25,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+// fixed point arithmetic (2^14). using 17.14 format.
+#define FIXED_INT 16384
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -113,6 +116,9 @@ struct thread
     struct semaphore sema_load;
     struct thread *parent;
     int return_status;
+    
+    /* Project 1 nice */
+    int nice;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
