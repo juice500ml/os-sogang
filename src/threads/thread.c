@@ -298,7 +298,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, list_thread_priority_less, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -367,7 +367,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, list_thread_priority_less, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -394,7 +394,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+
   thread_current ()->priority = new_priority;
+  
 }
 
 /* Returns the current thread's priority. */
@@ -410,10 +412,12 @@ thread_set_nice (int nice)
 {
   if(nice < -20) nice = -20;
   if(nice > 20) nice = 20;
-  thread_current()->nice = nice;
-  thread_update_priority(thread_current(), NULL);
-  enum intr_level old_level = intr_disable ();
-  intr_set_level(old_level);
+  
+  struct thread *t = thread_current ();
+  t->nice = nice;
+  thread_update_priority(t, NULL);
+  list_remove(&t->elem);
+  list_insert_ordered(&ready_list, &t->elem, list_thread_priority_less, NULL);
 }
 
 /* Returns the current thread's nice value. */
@@ -446,9 +450,11 @@ thread_update_recent_cpu (struct thread *t, void *aux UNUSED)
   uint32_t recent_cpu = t->recent_cpu;
   uint32_t load_avg = thread_update_load_avg(false);
   uint32_t nice = t->nice * FIXED_INT;
+  //printf("%s: recent_cpu %u, load_avg %u, nice %u -> ",t->name, recent_cpu, load_avg, t->nice);
   recent_cpu = ((uint64_t) (2*load_avg)) * recent_cpu / FIXED_INT;
   recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2+load_avg + FIXED_INT);
   recent_cpu += nice;
+  //printf("recent_cpu %u\n",recent_cpu);
   t->recent_cpu = recent_cpu;
 }
 
@@ -460,7 +466,13 @@ thread_update_priority (struct thread *t, void *aux UNUSED)
   uint32_t recent_cpu = t->recent_cpu;
   uint32_t nice = t->nice * FIXED_INT;
   uint32_t priority = PRI_MAX * FIXED_INT - recent_cpu / 4 - nice * 2;
-  t->priority = priority / FIXED_INT;
+  
+  // update priority only for BSD scheduler.
+  if(thread_mlfqs) {
+      t->priority = priority / FIXED_INT;
+      list_remove(&t->elem);
+      list_insert_ordered(&ready_list, &t->elem, list_thread_priority_less, NULL);
+  }
 }
 
 int
@@ -470,8 +482,9 @@ thread_update_load_avg (bool update)
   static uint32_t load_avg;
 
   // update load_avg
-  if(update) { 
+  if(update) {
       uint32_t ready_threads = list_size(&ready_list) * FIXED_INT;
+      if(thread_current() != idle_thread) ready_threads += FIXED_INT;
       load_avg = (load_avg * 59 + ready_threads) / 60;
   }
   return load_avg;
@@ -686,6 +699,13 @@ allocate_tid (void)
   return tid;
 }
 
+static bool
+list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  return ta->priority > tb->priority;
+}
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
