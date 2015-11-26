@@ -74,7 +74,6 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-static bool list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 
 /* Initializes the threading system by transforming the code
@@ -244,12 +243,14 @@ thread_create (const char *name, int priority,
   list_push_back(&parent->childlist, &t->childelem);
   t->parent = parent;
   
-  // Project 1. nice and priority value
+  // Project 1. nice and recent_cpu value
   t->nice = parent->nice;
   t->recent_cpu = parent->recent_cpu;
 
   /* Add to run queue. */
   thread_unblock (t);
+
+  thread_yield();
 
   return tid;
 }
@@ -394,9 +395,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-
-  thread_current ()->priority = new_priority;
-  
+  struct thread *t = thread_current ();
+  t->priority = new_priority;
+  thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -416,8 +417,7 @@ thread_set_nice (int nice)
   struct thread *t = thread_current ();
   t->nice = nice;
   thread_update_priority(t, NULL);
-  list_remove(&t->elem);
-  list_insert_ordered(&ready_list, &t->elem, list_thread_priority_less, NULL);
+  thread_yield();
 }
 
 /* Returns the current thread's nice value. */
@@ -450,11 +450,9 @@ thread_update_recent_cpu (struct thread *t, void *aux UNUSED)
   uint32_t recent_cpu = t->recent_cpu;
   uint32_t load_avg = thread_update_load_avg(false);
   uint32_t nice = t->nice * FIXED_INT;
-  //printf("%s: recent_cpu %u, load_avg %u, nice %u -> ",t->name, recent_cpu, load_avg, t->nice);
   recent_cpu = ((uint64_t) (2*load_avg)) * recent_cpu / FIXED_INT;
   recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2+load_avg + FIXED_INT);
   recent_cpu += nice;
-  //printf("recent_cpu %u\n",recent_cpu);
   t->recent_cpu = recent_cpu;
 }
 
@@ -488,6 +486,14 @@ thread_update_load_avg (bool update)
       load_avg = (load_avg * 59 + ready_threads) / 60;
   }
   return load_avg;
+}
+
+bool
+list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  return ta->priority > tb->priority;
 }
 
 
@@ -699,14 +705,6 @@ allocate_tid (void)
   return tid;
 }
 
-static bool
-list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-  struct thread *ta = list_entry(a, struct thread, elem);
-  struct thread *tb = list_entry(b, struct thread, elem);
-  return ta->priority > tb->priority;
-}
-
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
