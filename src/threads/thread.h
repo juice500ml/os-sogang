@@ -189,5 +189,6 @@ void thread_update_recent_cpu (struct thread *t, void *aux);
 void thread_update_priority (struct thread *t, void *aux);
 int thread_update_load_avg (bool update);
 bool list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
+void thread_priority_sort (void);
 
 #endif /* threads/thread.h */
