@@ -15,6 +15,7 @@
 #include "userprog/process.h"
 #endif
 #include "threads/malloc.h"
+#include "devices/timer.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -143,12 +144,11 @@ thread_tick (void)
   for(e = begin; e != end; ) {
     struct list_elem *next = list_next(e);
     struct threadwrapper *tw = list_entry(e, struct threadwrapper, threadelem);
-    tw->wakeup_time --;
-    if(tw->wakeup_time <= 0) {
-        thread_unblock(tw->t);
+    if(tw->wakeup_time <= timer_ticks() ) {
         enum intr_level old_level = intr_disable ();
         list_remove(&tw->threadelem);
         intr_set_level(old_level);
+        thread_unblock(tw->t);
         // TODO: pool for tw
         // free(tw);
     }
@@ -250,7 +250,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  thread_yield();
+  thread_yield ();
 
   return tid;
 }
@@ -466,11 +466,7 @@ thread_update_priority (struct thread *t, void *aux UNUSED)
   uint32_t priority = PRI_MAX * FIXED_INT - recent_cpu / 4 - nice * 2;
   
   // update priority only for BSD scheduler.
-  if(thread_mlfqs) {
-      t->priority = priority / FIXED_INT;
-      list_remove(&t->elem);
-      list_insert_ordered(&ready_list, &t->elem, list_thread_priority_less, NULL);
-  }
+  t->priority = priority / FIXED_INT;
 }
 
 int
@@ -494,6 +490,12 @@ list_thread_priority_less(const struct list_elem *a, const struct list_elem *b, 
   struct thread *ta = list_entry(a, struct thread, elem);
   struct thread *tb = list_entry(b, struct thread, elem);
   return ta->priority > tb->priority;
+}
+
+void
+thread_priority_sort (void)
+{
+  list_sort(&ready_list, list_thread_priority_less, NULL);
 }
 
 
