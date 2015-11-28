@@ -64,6 +64,9 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+// ticks for thread_aging
+static uint64_t aging_ticks; 
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -99,6 +102,7 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&blocked_list);
+  aging_ticks = 0;
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -250,7 +254,15 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  thread_yield ();
+  // update priorities
+  if(thread_mlfqs) {
+    thread_priority_sort ();
+    t = list_entry(list_begin(&ready_list), struct thread, elem);
+  }
+
+  // if new thread has more priority, yield.
+  if(t->priority > thread_current()->priority)
+    thread_yield ();
 
   return tid;
 }
@@ -280,6 +292,8 @@ thread_sleep (int64_t ticks)
   tw->wakeup_time = ticks;
   // block thread and push back into blocked_list
   list_push_back(&blocked_list, &tw->threadelem);
+  // erase from ready list
+  list_remove(&tw->t->elem);
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -397,7 +411,15 @@ thread_set_priority (int new_priority)
 {
   struct thread *t = thread_current ();
   t->priority = new_priority;
-  thread_yield();
+  
+  // update priorities
+  if(thread_mlfqs)
+    thread_priority_sort ();
+
+  struct thread *top = list_entry(list_begin(&ready_list), struct thread, elem);
+  // if new thread has more priority, yield.
+  if(top->priority > thread_current()->priority)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -417,7 +439,15 @@ thread_set_nice (int nice)
   struct thread *t = thread_current ();
   t->nice = nice;
   thread_update_priority(t, NULL);
-  thread_yield();
+  
+  // update priorities
+  if(thread_mlfqs)
+    thread_priority_sort ();
+
+  struct thread *top = list_entry(list_begin(&ready_list), struct thread, elem);
+  // if new thread has more priority, yield.
+  if(top->priority > thread_current()->priority)
+    thread_yield();
 }
 
 /* Returns the current thread's nice value. */

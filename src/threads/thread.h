@@ -164,6 +164,7 @@ void thread_block (void);
 void thread_unblock (struct thread *);
 // Project 1. push thread to sleep
 void thread_sleep (int64_t ticks);
+void thread_aging (void);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
