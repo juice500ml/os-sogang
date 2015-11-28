@@ -28,6 +28,9 @@ typedef int tid_t;
 // fixed point arithmetic (2^14). using 17.14 format.
 #define FIXED_INT 16384
 
+// aging ticks maximum
+#define AGING_MAX_TICKS 3000
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -150,6 +153,7 @@ struct threadwrapper
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+extern bool thread_prior_aging;
 
 void thread_init (void);
 void thread_start (void);

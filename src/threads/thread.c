@@ -63,6 +63,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+bool thread_prior_aging;
 
 // ticks for thread_aging
 static uint64_t aging_ticks; 
@@ -172,6 +173,10 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  
+  // thread aging
+  if (thread_prior_aging)
+    thread_aging();
 }
 
 /* Prints thread statistics. */
@@ -294,6 +299,26 @@ thread_sleep (int64_t ticks)
   list_push_back(&blocked_list, &tw->threadelem);
   // erase from ready list
   list_remove(&tw->t->elem);
+}
+
+void
+thread_aging (void)
+{
+  int top_priority = thread_current()->priority;
+  struct list_elem *e;
+
+  for(e=list_begin(&ready_list); e!=list_end(&ready_list); e=list_next(e)) {
+      if(list_entry(e, struct thread, elem)->priority < top_priority) {
+          aging_ticks++;
+          if(aging_ticks >= AGING_MAX_TICKS) {
+              aging_ticks = 0;
+              for(; e!=list_end(&ready_list); e=list_next(e))
+                list_entry(e, struct thread, elem)->priority++;
+              thread_priority_sort ();
+          }
+          break;
+      }
+  }
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
