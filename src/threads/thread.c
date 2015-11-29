@@ -308,10 +308,12 @@ thread_aging (void)
   struct list_elem *e;
 
   for(e=list_begin(&ready_list); e!=list_end(&ready_list); e=list_next(e)) {
+      // if aging candidate exists, increment ticks
       if(list_entry(e, struct thread, elem)->priority < top_priority) {
           aging_ticks++;
           if(aging_ticks >= AGING_MAX_TICKS) {
               aging_ticks = 0;
+              // ready_list is sorted, so after every e, increase priority
               for(; e!=list_end(&ready_list); e=list_next(e))
                 list_entry(e, struct thread, elem)->priority++;
               thread_priority_sort ();

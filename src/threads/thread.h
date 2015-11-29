@@ -29,7 +29,7 @@ typedef int tid_t;
 #define FIXED_INT 16384
 
 // aging ticks maximum
-#define AGING_MAX_TICKS 3000
+#define AGING_MAX_TICKS 1000
 
 /* A kernel thread or user process.
 
