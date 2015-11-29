@@ -139,6 +139,10 @@ void
 thread_tick (void) 
 {
   struct thread *t = thread_current ();
+  
+  // thread recent_cpu increment
+  if(t!=idle_thread)
+    t->recent_cpu += FIXED_INT;
 
   // Search for to-be-freed thread from blocked_list
   // Another thread can be pushed while iterating list
@@ -150,12 +154,8 @@ thread_tick (void)
     struct list_elem *next = list_next(e);
     struct threadwrapper *tw = list_entry(e, struct threadwrapper, threadelem);
     if(tw->wakeup_time <= timer_ticks() ) {
-        enum intr_level old_level = intr_disable ();
         list_remove(&tw->threadelem);
-        intr_set_level(old_level);
         thread_unblock(tw->t);
-        // TODO: pool for tw
-        // free(tw);
     }
     e = next;
   }
@@ -435,15 +435,15 @@ void
 thread_set_priority (int new_priority) 
 {
   struct thread *t = thread_current ();
-  t->priority = new_priority;
+  if(t!=idle_thread)
+    t->priority = new_priority;
   
   // update priorities
-  if(thread_mlfqs)
-    thread_priority_sort ();
+  thread_priority_sort ();
 
   struct thread *top = list_entry(list_begin(&ready_list), struct thread, elem);
   // if new thread has more priority, yield.
-  if(top->priority > thread_current()->priority)
+  if(top->priority > t->priority)
     thread_yield();
 }
 
@@ -464,14 +464,14 @@ thread_set_nice (int nice)
   struct thread *t = thread_current ();
   t->nice = nice;
   thread_update_priority(t, NULL);
-  
+ 
   // update priorities
-  if(thread_mlfqs)
-    thread_priority_sort ();
-
+  thread_priority_sort ();
+  
   struct thread *top = list_entry(list_begin(&ready_list), struct thread, elem);
+  
   // if new thread has more priority, yield.
-  if(top->priority > thread_current()->priority)
+  if(top->priority > t->priority)
     thread_yield();
 }
 
@@ -506,7 +506,7 @@ thread_update_recent_cpu (struct thread *t, void *aux UNUSED)
   uint32_t load_avg = thread_update_load_avg(false);
   uint32_t nice = t->nice * FIXED_INT;
   recent_cpu = ((uint64_t) (2*load_avg)) * recent_cpu / FIXED_INT;
-  recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2+load_avg + FIXED_INT);
+  recent_cpu = ((uint64_t) recent_cpu) * FIXED_INT / (2*load_avg + FIXED_INT);
   recent_cpu += nice;
   t->recent_cpu = recent_cpu;
 }
@@ -521,7 +521,8 @@ thread_update_priority (struct thread *t, void *aux UNUSED)
   uint32_t priority = PRI_MAX * FIXED_INT - recent_cpu / 4 - nice * 2;
   
   // update priority only for BSD scheduler.
-  t->priority = priority / FIXED_INT;
+  if(t!=idle_thread)
+    t->priority = priority / FIXED_INT;
 }
 
 int
