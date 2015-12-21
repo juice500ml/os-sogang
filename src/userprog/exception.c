@@ -5,6 +5,10 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/syscall.h"
+#include "threads/palloc.h"
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -109,6 +113,17 @@ kill (struct intr_frame *f)
     }
 }
 
+
+// check if address is user stack address
+static bool
+is_user_saddr(void *fault_addr, void *esp, bool user)
+{
+  void *fault_page = pg_round_down(fault_addr);
+  if(fault_page < PHYS_BASE - PGSIZE*2048) // maximum 8M stack
+    return false;
+  return true;
+}
+
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -159,5 +174,14 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);
 */
+  if(!not_present)
+    syscall_exit(-1);
+ 
+  if(!is_user_saddr(fault_addr, f->esp, user))
+    syscall_exit(-1);
+
+  void *fault_page = pg_round_down(fault_addr);
+  void *kpage = palloc_get_page(PAL_USER);
+  install_page(fault_page, kpage, true);
 }
 
