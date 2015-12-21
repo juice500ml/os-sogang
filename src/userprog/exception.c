@@ -123,14 +123,10 @@ kill (struct intr_frame *f)
 static void
 page_fault (struct intr_frame *f) 
 {
- // bool not_present;  /* True: not-present page, false: writing r/o page. */
- // bool write;        /* True: access was write, false: access was read. */
-//  bool user;         /* True: access by user, false: access by kernel. */
+  bool not_present;  /* True: not-present page, false: writing r/o page. */
+  bool write;        /* True: access was write, false: access was read. */
+  bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
-
-  // 3.1.5 accessing user memory: copy eax to eip and set -1
-  f->eip = (void*) f->eax;
-  f->eax = -1;
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -149,10 +145,10 @@ page_fault (struct intr_frame *f)
   page_fault_cnt++;
 
   /* Determine cause. */
-/*  not_present = (f->error_code & PF_P) == 0;
+  not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-*/
+
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
@@ -163,7 +159,5 @@ page_fault (struct intr_frame *f)
           user ? "user" : "kernel");
   kill (f);
 */
-  // Project 2. if fault pointer comes in, do not kill. just exit.
-  syscall_exit(-1);
 }
 
