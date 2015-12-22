@@ -117,14 +117,13 @@ kill (struct intr_frame *f)
 
 // check if address is user stack address
 static bool
-is_user_saddr(void *fault_addr, void *esp, bool user)
+is_user_saddr(void *fault_addr, void *esp)
 {
   void *fault_page = pg_round_down(fault_addr);
   if(fault_page < PHYS_BASE - PGSIZE*2048) // maximum 8M stack
     return false;
-  if(user) // Instruction PUSH(4 bytes), PUSHA(32 bytes)
-    return (fault_addr >= esp) || (fault_addr+4 == esp) || (fault_addr+32 == esp);
-  return true;
+  // Instruction PUSH(4 bytes), PUSHA(32 bytes)
+  return (fault_addr >= esp) || (fault_addr+4 == esp) || (fault_addr+32 == esp);
 }
 
 /* Page fault handler.  This is a skeleton that must be filled in
@@ -180,7 +179,7 @@ page_fault (struct intr_frame *f)
   if(!not_present)
     syscall_exit(-1);
  
-  if(!is_user_saddr(fault_addr, f->esp, user))
+  if(!is_user_saddr(fault_addr, user ? f->esp : thread_current()->esp))
     syscall_exit(-1);
 
   void *fault_page = pg_round_down(fault_addr);

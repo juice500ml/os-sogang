@@ -117,6 +117,8 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    /* Project 3 user stack pointer for growth */
+    void *esp;
 #endif
 
     /* Owned by thread.c. */

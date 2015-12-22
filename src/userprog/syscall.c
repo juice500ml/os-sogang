@@ -32,7 +32,11 @@ syscall_handler (struct intr_frame *f)
 {
   if(f->esp==NULL || !is_user_vaddr(f->esp))
     syscall_exit(-1);
-  
+
+  // update user stack pointer
+  // when pagefault, handler cannot know user stack because kernel mode.
+  thread_current()->esp = f->esp;
+
   // TODO: clean up this mess.
   int syscall_number = *((int*)f->esp);
   switch(syscall_number)
