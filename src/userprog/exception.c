@@ -9,6 +9,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -121,6 +122,8 @@ is_user_saddr(void *fault_addr, void *esp, bool user)
   void *fault_page = pg_round_down(fault_addr);
   if(fault_page < PHYS_BASE - PGSIZE*2048) // maximum 8M stack
     return false;
+  if(user) // Instruction PUSH(4 bytes), PUSHA(32 bytes)
+    return (fault_addr >= esp) || (fault_addr+4 == esp) || (fault_addr+32 == esp);
   return true;
 }
 
@@ -181,7 +184,7 @@ page_fault (struct intr_frame *f)
     syscall_exit(-1);
 
   void *fault_page = pg_round_down(fault_addr);
-  void *kpage = palloc_get_page(PAL_USER);
+  void *kpage = get_frame(PAL_USER);
   install_page(fault_page, kpage, true);
 }
 
