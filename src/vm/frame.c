@@ -5,7 +5,8 @@
 
 // wrapper for palloc
 // get user frame
-void *get_frame(enum palloc_flags flags)
+void *
+get_frame(enum palloc_flags flags)
 {
   void *kpage = palloc_get_page (flags);
   if (flags == PAL_USER || flags == (PAL_USER | PAL_ZERO))

@@ -7,6 +7,6 @@
 #include <list.h>
 #include "threads/palloc.h"
 
-void *get_frame(enum palloc_flags);
+void *get_frame (enum palloc_flags);
 
 #endif /* vm/frame.h */
