@@ -44,10 +44,33 @@ install_page (void *upage, void *kpage, bool writable)
 void
 add_page (void *kpage)
 {
-  struct page *p = malloc(sizeof(struct page));
+  struct page *p = NULL;
+  
+  // find for empty entry
+  struct list_elem *e;
+  for(e=list_begin(&all_pages); e!=list_end(&all_pages); e=list_next(e)) {
+    struct page *tmp = list_entry(e, struct page, elem);
+    if(tmp->th==NULL) {
+        p = tmp;
+        break;
+    }
+  }
+
+  if(p==NULL) p = malloc(sizeof(struct page));
   p->upage = NULL;
   p->kpage = kpage;
   p->th = thread_current ();
   list_push_back (&all_pages, &p->elem);
 }
 
+// remove every relation within thread t
+void
+destroy_page_by_thread (struct thread *t)
+{
+  struct list_elem *e;
+  for(e=list_begin(&all_pages); e!=list_end(&all_pages); e=list_next(e)) {
+      struct page *p = list_entry(e, struct page, elem);
+      // if p->th is NULL, this entry is empty
+      if(p->th == t) p->th = NULL;
+  }
+}

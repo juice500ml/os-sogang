@@ -16,5 +16,6 @@ struct page
 
 bool install_page (void *upage, void *kpage, bool writable);
 void add_page (void *kpage);
+void destroy_page_by_thread (struct thread *t);
 
 #endif /* vm/page.h */
