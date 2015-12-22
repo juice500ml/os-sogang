@@ -32,7 +32,6 @@ install_page (void *upage, void *kpage, bool writable)
           struct page *p = list_entry(e, struct page, elem);
           // If found, map kpage and upage
           if(p->kpage==kpage && p->th == th) {
-              ASSERT (p->upage == NULL);
               p->upage = upage;
               return true;
           }
