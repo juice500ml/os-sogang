@@ -56,8 +56,10 @@ add_page (void *kpage)
         break;
     }
   }
-
+  // empty entry not found
   if(p==NULL) p = malloc(sizeof(struct page));
+
+  // add it to all_pages
   p->upage = NULL;
   p->kpage = kpage;
   p->th = thread_current ();
