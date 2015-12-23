@@ -127,6 +127,9 @@ main (void)
   filesys_init (format_filesys);
 #endif
 
+  // Project 3. Swap device init.
+  swap_init ();
+
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */
