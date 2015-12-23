@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-void init_swap (void);
+void swap_init (void);
+void swap_in (size_t idx, void *kpage);
+size_t swap_out (void *kpage);
 
 #endif /* vm/swap.h */

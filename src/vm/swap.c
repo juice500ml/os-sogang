@@ -23,6 +23,9 @@ swap_in (size_t idx, void *kpage)
 {
   lock_acquire(&swap_lock);
 
+  // lazy loading
+  if(swap_device == NULL) swap_init();
+
   lock_release(&swap_lock);
 }
 
@@ -33,5 +36,9 @@ swap_out (void *kpage)
 {
   lock_acquire(&swap_lock);
 
+  // lazy loading
+  if(swap_device == NULL) swap_init();
+  
   lock_release(&swap_lock);
 }
+
