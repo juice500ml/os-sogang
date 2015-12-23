@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 void swap_init (void);
-void swap_in (size_t idx, void *kpage);
-size_t swap_out (void *kpage);
+void swap_in (int idx, void *kpage);
+int swap_out (void *kpage);
 
 #endif /* vm/swap.h */
