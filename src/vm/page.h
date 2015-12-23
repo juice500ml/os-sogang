@@ -12,6 +12,7 @@ struct page
     void *kpage;
     struct thread *th;
     struct list_elem elem;
+    bool writable;
   };
 
 bool install_page (void *upage, void *kpage, bool writable);

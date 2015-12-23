@@ -33,6 +33,7 @@ install_page (void *upage, void *kpage, bool writable)
           // If found, map kpage and upage
           if(p->kpage==kpage && p->th == th) {
               p->upage = upage;
+              p->writable = writable;
               return true;
           }
       }
