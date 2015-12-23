@@ -31,7 +31,7 @@ install_page (void *upage, void *kpage, bool writable)
       for(e=list_begin(&all_pages); e!=list_end(&all_pages); e=list_next(e)) {
           struct page *p = list_entry(e, struct page, elem);
           // If found, map kpage and upage
-          if(p->kpage==kpage && p->th == th) {
+          if(p->kpage == kpage && p->th == th) {
               p->upage = upage;
               p->writable = writable;
               return true;
