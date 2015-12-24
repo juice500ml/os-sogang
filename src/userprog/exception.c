@@ -171,12 +171,12 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("[PGFT] Page fault at %p: %s error %s page in %s context.\n",
+/*  printf ("[PGFT] Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-/*  kill (f);
+  kill (f);
 */
   if(!not_present) {
       syscall_exit(-1);
@@ -193,8 +193,11 @@ page_fault (struct intr_frame *f)
           return;
       }
 
-      void *kpage = get_frame (PAL_USER);
-      if(!install_page(fault_page, kpage, true)) kill(f);
+      size_t i, needed_page = (PHYS_BASE - fault_page) / PGSIZE;
+      for(i=0;i<needed_page;++i)
+        if(pagedir_get_page(thread_current()->pagedir, fault_page+i*PGSIZE) != NULL 
+           || !install_page(fault_page+i*PGSIZE, get_frame(PAL_USER), true))
+          kill(f);
       //printf("[GROW] upage %p kpage %p\n", pg->upage, kpage);
   }
   // in swap page
@@ -206,14 +209,15 @@ page_fault (struct intr_frame *f)
       void *kpage = get_only_frame (PAL_USER);
       //printf("[SWAP] upage %p kpage %p(->%p)\n", pg->upage, fr->kpage, kpage);
       swap_in (fr->swap_index, kpage);
-      fr->swap_index = -1;
 
       struct list_elem *e;
       for(e=list_begin(&fr->page_list); e!=list_end(&fr->page_list); e=list_next(e)) {
         pg = list_entry (e, struct page, elem);
         pagedir_set_page (pg->th->pagedir, pg->upage, kpage, pg->writable);
+        //pagedir_set_accessed (pg->th->pagedir, pg->upage, true);
       }
       fr->kpage = kpage;
+      fr->swap_index = -1;
   }
 }
 
