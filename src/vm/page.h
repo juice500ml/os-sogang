@@ -5,18 +5,31 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <list.h>
+#include "threads/palloc.h"
+
+struct frame
+  {
+    void *kpage;
+    int swap_index;
+    struct list page_list;
+    struct list_elem elem;
+  };
 
 struct page
   {
     void *upage;
-    void *kpage;
     struct thread *th;
-    struct list_elem elem;
     bool writable;
+    struct list_elem elem;
   };
 
 bool install_page (void *upage, void *kpage, bool writable);
-void add_page (void *kpage);
+void add_frame (void *kpage);
+void *get_frame (enum palloc_flags flags);
+void *get_only_frame (enum palloc_flags flags);
 void destroy_page_by_thread (struct thread *t);
+struct page *find_page_by_upage (void *upage);
+struct frame *find_frame_by_upage (void *upage);
+struct frame *candidate_frame (void);
 
 #endif /* vm/page.h */
