@@ -8,5 +8,6 @@
 void swap_init (void);
 void swap_in (int idx, void *kpage);
 int swap_out (void *kpage);
+void swap_remove (int swap_index);
 
 #endif /* vm/swap.h */
