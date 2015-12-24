@@ -9,7 +9,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "vm/page.h"
-#include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -117,11 +117,13 @@ kill (struct intr_frame *f)
 
 // check if address is user stack address
 static bool
-is_user_saddr(void *fault_addr, void *esp)
+is_user_saddr(void *fault_addr, void *esp, bool user)
 {
   void *fault_page = pg_round_down(fault_addr);
-  if(fault_page < PHYS_BASE - PGSIZE*2048) // maximum 8M stack
+  if(fault_page < PHYS_BASE - PGSIZE*4096) // maximum 16M stack
     return false;
+  if(!user) esp = thread_current ()->esp;
+  else thread_current ()->esp = esp;
   // Instruction PUSH(4 bytes), PUSHA(32 bytes)
   return (fault_addr >= esp) || (fault_addr+4 == esp) || (fault_addr+32 == esp);
 }
@@ -169,21 +171,49 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-/*  printf ("Page fault at %p: %s error %s page in %s context.\n",
+  printf ("[PGFT] Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-  kill (f);
+/*  kill (f);
 */
-  if(!not_present)
-    syscall_exit(-1);
- 
-  if(!is_user_saddr(fault_addr, user ? f->esp : thread_current()->esp))
-    syscall_exit(-1);
-
+  if(!not_present) {
+      syscall_exit(-1);
+      return;
+  } 
   void *fault_page = pg_round_down(fault_addr);
-  void *kpage = get_frame(PAL_USER);
-  install_page(fault_page, kpage, true);
+  struct page *pg = find_page_by_upage(fault_page);
+
+  // stack growth
+  if(pg==NULL) {
+      // TODO: context switching where?
+      if(!is_user_saddr(fault_addr, f->esp, user)) {
+          syscall_exit(-1);
+          return;
+      }
+
+      void *kpage = get_frame (PAL_USER);
+      if(!install_page(fault_page, kpage, true)) kill(f);
+      //printf("[GROW] upage %p kpage %p\n", pg->upage, kpage);
+  }
+  // in swap page
+  else {
+      struct frame *fr = find_frame_by_upage(fault_page);
+      ASSERT (fr != NULL);
+      ASSERT (fr->swap_index != -1);
+      
+      void *kpage = get_only_frame (PAL_USER);
+      //printf("[SWAP] upage %p kpage %p(->%p)\n", pg->upage, fr->kpage, kpage);
+      swap_in (fr->swap_index, kpage);
+      fr->swap_index = -1;
+
+      struct list_elem *e;
+      for(e=list_begin(&fr->page_list); e!=list_end(&fr->page_list); e=list_next(e)) {
+        pg = list_entry (e, struct page, elem);
+        pagedir_set_page (pg->th->pagedir, pg->upage, kpage, pg->writable);
+      }
+      fr->kpage = kpage;
+  }
 }
 
