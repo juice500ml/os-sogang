@@ -90,6 +90,7 @@ find_file (int fd)
   struct thread *current = thread_current();
   struct list_elem *e, *found = NULL;
 
+  lock_acquire(&filelock);  
   // look for fd in filelist
   for(e=list_begin(&current->filelist); e!=list_end(&current->filelist); e = list_next(e))
     {
@@ -99,6 +100,7 @@ find_file (int fd)
           break;
         }
     }
+  lock_release(&filelock);  
   // not found
   if(found == NULL) return NULL;
 

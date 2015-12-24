@@ -23,6 +23,7 @@ struct page
     struct list_elem elem;
   };
 
+void page_init (void);
 bool install_page (void *upage, void *kpage, bool writable);
 void add_frame (void *kpage);
 void *get_frame (enum palloc_flags flags);

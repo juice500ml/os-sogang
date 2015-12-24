@@ -194,9 +194,10 @@ page_fault (struct intr_frame *f)
       }
 
       size_t i, needed_page = (PHYS_BASE - fault_page) / PGSIZE;
-      for(i=0;i<needed_page;++i)
-        if(pagedir_get_page(thread_current()->pagedir, fault_page+i*PGSIZE) != NULL 
-           || !install_page(fault_page+i*PGSIZE, get_frame(PAL_USER), true))
+      //for(i=0;i<needed_page;++i)
+        //if(pagedir_get_page(thread_current()->pagedir, fault_page+i*PGSIZE) != NULL 
+        //   || !install_page(fault_page+i*PGSIZE, get_frame(PAL_USER), true))
+        if(!install_page(fault_page+i*PGSIZE, get_frame(PAL_USER), true))
           kill(f);
       //printf("[GROW] upage %p kpage %p\n", pg->upage, kpage);
   }
@@ -210,11 +211,16 @@ page_fault (struct intr_frame *f)
       //printf("[SWAP] upage %p kpage %p(->%p)\n", pg->upage, fr->kpage, kpage);
       swap_in (fr->swap_index, kpage);
 
-      struct list_elem *e;
-      for(e=list_begin(&fr->page_list); e!=list_end(&fr->page_list); e=list_next(e)) {
-        pg = list_entry (e, struct page, elem);
-        pagedir_set_page (pg->th->pagedir, pg->upage, kpage, pg->writable);
-        //pagedir_set_accessed (pg->th->pagedir, pg->upage, true);
+      struct list_elem *e, *nexte;
+      for(e=list_begin(&fr->page_list); e!=list_end(&fr->page_list); e=nexte) {
+          nexte = list_next(e);
+          pg = list_entry (e, struct page, elem);
+          pagedir_set_page (pg->th->pagedir, pg->upage, kpage, pg->writable);
+          if(pg->upage == fault_page) {
+              pagedir_set_accessed (pg->th->pagedir, pg->upage, true);
+              list_remove (e);
+              list_push_front (&fr->page_list, e);
+          }
       }
       fr->kpage = kpage;
       fr->swap_index = -1;
