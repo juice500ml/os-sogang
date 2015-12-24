@@ -168,16 +168,6 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-/*  printf ("[PGFT] Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
-*/
   if(!not_present) {
       syscall_exit(-1);
       return;
@@ -193,13 +183,8 @@ page_fault (struct intr_frame *f)
           return;
       }
 
-      size_t i, needed_page = (PHYS_BASE - fault_page) / PGSIZE;
-      //for(i=0;i<needed_page;++i)
-        //if(pagedir_get_page(thread_current()->pagedir, fault_page+i*PGSIZE) != NULL 
-        //   || !install_page(fault_page+i*PGSIZE, get_frame(PAL_USER), true))
-        if(!install_page(fault_page+i*PGSIZE, get_frame(PAL_USER), true))
-          kill(f);
-      //printf("[GROW] upage %p kpage %p\n", pg->upage, kpage);
+      if(!install_page(fault_page, get_frame(PAL_USER), true))
+        kill(f);
   }
   // in swap page
   else {
@@ -208,7 +193,6 @@ page_fault (struct intr_frame *f)
       ASSERT (fr->swap_index != -1);
       
       void *kpage = get_only_frame (PAL_USER);
-      //printf("[SWAP] upage %p kpage %p(->%p)\n", pg->upage, fr->kpage, kpage);
       swap_in (fr->swap_index, kpage);
 
       struct list_elem *e, *nexte;

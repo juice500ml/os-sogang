@@ -9,15 +9,7 @@
 
 // List of all frames
 static struct list all_frames = LIST_INITIALIZER (all_frames);
-static struct lock page_lock;
 static bool is_lock_init;
-
-void
-page_init (void)
-{
-  is_lock_init = true;
-  lock_init (&page_lock);
-}
 
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
@@ -37,8 +29,6 @@ install_page (void *upage, void *kpage, bool writable)
   ASSERT (is_user_vaddr(upage));
   ASSERT (is_kernel_vaddr(kpage));
 
-//  if(!is_lock_init) page_init ();
-//  lock_acquire (&page_lock);
   struct thread *th = thread_current ();
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
@@ -60,12 +50,10 @@ install_page (void *upage, void *kpage, bool writable)
               p->writable = writable;
 
               list_push_back (&f->page_list, &p->elem);
-//              lock_release (&page_lock);
               return true;
           }
       }
   }
-//  lock_release (&page_lock);
   return false;
 }
 
@@ -83,10 +71,7 @@ add_frame (void *kpage)
   f->swap_index = -1;
   list_init (&f->page_list);
   
-  if(!is_lock_init) page_init ();
-  lock_acquire (&page_lock);
   list_push_back (&all_frames, &f->elem);
-  lock_release (&page_lock);
 }
 
 // wrapper for palloc
@@ -112,15 +97,12 @@ get_only_frame (enum palloc_flags flags)
       ASSERT (f->swap_index == -1);
       f->swap_index = swap_out (f->kpage);
      
-//      if(!is_lock_init) page_init ();
-//      lock_acquire (&page_lock);
       // clear upage
       struct list_elem *e;
       for(e=list_begin(&f->page_list); e!=list_end(&f->page_list); e=list_next(e)) {
           struct page *p = list_entry(e, struct page, elem);
           pagedir_clear_page (p->th->pagedir, p->upage);
       }
-//      lock_release (&page_lock);
       // clear kpage
       palloc_free_page (f->kpage);
       // get new page
@@ -209,7 +191,6 @@ find_frame_by_upage (void *upage)
 struct frame *
 candidate_frame (void)
 {
-//  if(!is_lock_init) page_init ();
   while(true) {
       struct list_elem *fe = list_pop_front (&all_frames);
       struct frame *f = list_entry(fe, struct frame, elem);
