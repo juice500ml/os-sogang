@@ -200,11 +200,7 @@ page_fault (struct intr_frame *f)
           nexte = list_next(e);
           pg = list_entry (e, struct page, elem);
           pagedir_set_page (pg->th->pagedir, pg->upage, kpage, pg->writable);
-          if(pg->upage == fault_page) {
-              pagedir_set_accessed (pg->th->pagedir, pg->upage, true);
-              list_remove (e);
-              list_push_front (&fr->page_list, e);
-          }
+          pagedir_set_accessed (pg->th->pagedir, pg->upage, true);
       }
       fr->kpage = kpage;
       fr->swap_index = -1;
